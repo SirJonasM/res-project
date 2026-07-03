@@ -1,0 +1,14 @@
+**/build/**
+.direnv
+.envrc
+chipdb
+**/lib-obj08.cf
+**/sim_build/
+*.zip
+**/__pycache__
+target
+*.bin
+*.hex
+*.asm
+*.elf
+*.cf

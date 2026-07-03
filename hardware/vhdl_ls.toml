@@ -1,0 +1,8 @@
+[libraries]
+neorv32.files = ["main.vhd", "risc_core/rtl/core/*.vhd"]
+lib.files = ["main.vhd", "src/*.vhd"]
+
+
+
+
+

@@ -1,0 +1,9 @@
+[package]
+name = "bootloader"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+pac = {path = "../pac", default-features = false}
+riscv = {version = "0.16.1", default-features = false}

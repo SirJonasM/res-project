@@ -1,0 +1,13 @@
+[workspace]
+resolver = "3"
+members = [
+    "bootloader",
+    "application",
+	"protocol"
+, "pac"]
+
+# Shared build configuration across all embedded crates
+[profile.release]
+opt-level = "z"     # Optimize for size (great for block RAMs)
+lto = true          # Link-Time Optimization
+codegen-units = 1   # Better optimization and size reduction

@@ -1,0 +1,9 @@
+[toolchain]
+# Matches the stable channel used in your Nix flake environment
+channel = "nightly"
+
+# Explicitly locks down the bare-metal RISC-V target for your PicoRV32 core
+targets = [ "riscv32i-unknown-none-elf" ]
+
+# Core development extensions to keep your IDE/editor integration fully functional
+components = ["cargo", "rust-src", "rust-analyzer", "clippy" , "llvm-tools"]

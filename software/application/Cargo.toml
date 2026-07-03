@@ -1,0 +1,9 @@
+[package]
+name = "application"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+pac = { path="../pac" , features = ["application"]}
+riscv = { version = "0.16.1", default-features = false }
