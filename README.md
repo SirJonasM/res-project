@@ -1,8 +1,4 @@
-Hier ist eine strukturierte, professionelle und direkt einsatzbereite `README.md` für dein Repository. Sie nutzt Markdown-Elemente für eine optimale Lesbarkeit und fasst deinen gesamten Workflow exakt zusammen.
 
----
-
-```markdown
 # FPGA Game Project & NeoV32 Bootloader
 
 This repository contains a hardware/software co-design for an FPGA-based game engine limited to **36 Kb BRAM**. To bypass memory constraints, the project uses a custom video generator (Tilemap & Sprite engine) and a tiny Rust-based bootloader embedded directly within the FPGA bitstream.
