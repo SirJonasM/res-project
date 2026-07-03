@@ -1,5 +1,9 @@
 # --- Top-Level Orchestrator Makefile ---
 
+# Dynamic system detection so it works seamlessly on WSL, NixOS, or macOS
+SYSTEM     := $(shell nix eval --raw nixpkgs\#stdenv.hostPlatform.system)
+NIX_DEV    := nix develop github:openxc7/toolchain-nix/0.7.0\#devShell.$(SYSTEM) --command
+
 # Source tracking for incremental compilation
 BOOTLOADER_SRCS := $(wildcard software/bootloader/src/**/*.rs) software/Cargo.toml software/bootloader/Cargo.toml software/bootloader/boot.ld software/.cargo/config.toml
 ELF_OUT         := software/target/riscv32i-unknown-none-elf/release/bootloader
@@ -10,16 +14,16 @@ BIN_FILE        := hardware/firmware.bin
 
 # Default rule: Build firmware, convert, and run synthesis
 all: $(HEX_FILE)
-	nix develop github:openxc7/toolchain-nix/0.7.0 --command make -C hardware all
+	$(NIX_DEV) make -C hardware all
 
 # Route testing through the hardware nix environment shell
 test: $(HEX_FILE)
 	riscv64-none-elf-objdump -d $(ELF_OUT) > firmware.asm
-	nix develop github:openxc7/toolchain-nix/0.7.0 --command make -C hardware test
+	$(NIX_DEV) make -C hardware test
 
 # Route programming through the hardware nix environment shell
 program:
-	nix develop github:openxc7/toolchain-nix/0.7.0 --command make -C hardware program
+	$(NIX_DEV) make -C hardware program
 
 # 1. Process flat binary into FPGA-ready hexadecimal format using dynamic arguments
 $(HEX_FILE): $(BIN_FILE)
@@ -41,4 +45,4 @@ $(ELF_OUT): $(BOOTLOADER_SRCS)
 clean:
 	rm -f $(BIN_FILE) $(HEX_FILE)
 	cd software && cargo clean
-	nix develop github:openxc7/toolchain-nix/0.7.0 --command make -C hardware clean
+	$(NIX_DEV) make -C hardware clean
