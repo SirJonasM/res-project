@@ -14,7 +14,7 @@
         pkgs = import nixpkgs { inherit system overlays; };
 
         # 1. Parse the Rust toolchain straight from your project's configuration file
-        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./project/software/rust-toolchain.toml;
+        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./software/rust-toolchain.toml;
 
         vsg = pkgs.python3Packages.buildPythonPackage rec {
           pname = "vsg";
