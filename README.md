@@ -5,7 +5,7 @@ This repository contains a hardware/software co-design for an FPGA-based game en
 
 ---
 
-## 🛠️ Prerequisites & Development Environment
+## Prerequisites & Development Environment
 
 The entire toolchain (GHDL/Verilator, Rust RISC-V target, OpenFPGALoader, Python dependencies) is completely managed via **Nix**.
 
@@ -17,28 +17,25 @@ nix develop
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 * `hardware/` — Contains the VHDL top-level code, custom video generator, and the `neorv32` processor submodule.
 * `software/` — A Rust workspace containing:
-* `bootloader` — The minimalist primary bootloader (embedded into BRAM).
-* `application` — The actual game logic.
-* `pac / library` — Low-level hardware abstraction layer for the custom FPGA peripherals.
+    * `bootloader` — The minimalist primary bootloader (embedded into BRAM).
+    * `application` — The actual game logic.
+    * `pac / library` — Low-level hardware abstraction layer for the custom FPGA peripherals.
 
 
 
 ---
 
-## 🚀 Development Workflow
+## Development Workflow
 
 The deployment workflow split into two phases: **Hardware Synthesis** (infrequent) and **Application Upload** (frequent development loop).
-
-```
-[ Nix Develop ] ──> 1. Build Bootloader ──> 2. Synthesize & Flash Bitstream (FPGA)
-                                                      │
-[ Code Game ]   ──> 3. Build App Bin   ──> 4. Stream via Serial (Python) ──> Run!
-
-```
+1. Build Bootloader 
+2. Synthesize & Flash Bitstream (FPGA)
+3. Build App Bin   
+4. Stream via Serial (Python)
 
 ### Phase 1: Hardware & Bootloader Generation
 
@@ -49,14 +46,12 @@ The bootloader must be compiled in `release` mode to fit into the initial BRAM a
 cd software
 cargo build --release -p bootloader
 cd ..
-
 ```
 
 
 2. **Run Simulations (Optional):**
 ```bash
 make test
-
 ```
 
 
@@ -65,7 +60,6 @@ This compiles the VHDL code (injecting the compiled bootloader binary into the b
 ```bash
 make
 sudo make program
-
 ```
 
 
@@ -79,7 +73,6 @@ Once the hardware and bootloader are flashed onto the FPGA, you do not need to r
 ```bash
 cd software
 cargo build --release -p application
-
 ```
 
 
@@ -88,7 +81,6 @@ Convert the compiled ELF target into a flat binary image at the project root:
 ```bash
 cargo objcopy -p application --release -- -O binary ../app.bin
 cd ..
-
 ```
 
 
@@ -96,16 +88,14 @@ cd ..
 Run the Python deployment script to send `app.bin` over the serial interface. The embedded bootloader will catch the binary, load it into the remaining RAM, and drop you directly into an interactive UART session.
 ```bash
 python pyserial.py
-
 ```
 
 
 
 ---
 
-## ⚡ Important Memory Constraints
+## Important Memory Constraints
 
- ⚠️ **Memory Warning:** The design operates with only 36 Kb of BRAM.
+**Memory Warning:** The design operates with only 36 Kb of BRAM.
  * Always use `--release` for software builds.
- * Avoid `core::fmt` or complex `println!` macros in default builds to prevent binary bloat (`section .text will not fit in region ram`).
  
