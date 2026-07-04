@@ -29,16 +29,29 @@ entity main is
     led15       : out   std_logic;
     rs_rx       : in    std_logic;
     rs_tx       : out   std_logic;
-    btn_c       : in    std_logic
+    btn_c       : in    std_logic;
+    vga_red_0   : out   std_logic;
+    vga_red_1   : out   std_logic;
+    vga_red_2   : out   std_logic;
+    vga_red_3   : out   std_logic;
+    vga_blue_0  : out   std_logic;
+    vga_blue_1  : out   std_logic;
+    vga_blue_2  : out   std_logic;
+    vga_blue_3  : out   std_logic;
+    vga_green_0 : out   std_logic;
+    vga_green_1 : out   std_logic;
+    vga_green_2 : out   std_logic;
+    vga_green_3 : out   std_logic;
+    h_sync      : out   std_logic;
+    v_sync      : out   std_logic
   );
 end entity main;
 
 architecture structural of main is
 
-  constant interrupt_count : positive := 2;
+  constant interrupt_count : positive := 3;
 
   -- Hardware Register to hold the LED state (0 = Off, 1 = On)
-
   signal interrupt_pulse : std_logic;
   signal led_reg         : std_logic_vector(15 downto 0);
   signal led_rdata       : std_logic_vector(31 downto 0);
@@ -55,22 +68,17 @@ architecture structural of main is
   signal system_reset_n : std_logic            := '0';
   signal reset_cnt      : unsigned(3 downto 0) := (others => '0');
 
-  -- Clocking Trackers
-  signal pixel_clock : std_logic := '0';
-
   -- System Core Bus Fabric Interconnect Signals
   signal cpu_bram_addr  : std_logic_vector(31 downto 0);
   signal cpu_bram_wdata : std_logic_vector(31 downto 0);
   signal cpu_bram_rdata : std_logic_vector(31 downto 0);
   signal cpu_bram_ack   : std_logic := '0';
 
-
   -- Signals to interface the Trap Monitor
   signal trap_uart_tx : std_logic;
   signal trap_active  : std_logic;
   signal core_uart_tx : std_logic; -- Captures output of normal UART core
   signal uart_ack     : std_logic := '0';
-
 
   -- Flattened XBUS Wires
   signal xbus_adr_sig       : std_ulogic_vector(31 downto 0);
@@ -90,9 +98,19 @@ architecture structural of main is
   signal sel_led  : std_logic;
   signal sel_irq  : std_logic;
 
+  signal pixel_pulse : std_logic;
+
+  -- VGA Wiring Slits
+  signal vga_red_sig      : std_logic_vector(3 downto 0);
+  signal vga_green_sig    : std_logic_vector(3 downto 0);
+  signal vga_blue_sig     : std_logic_vector(3 downto 0);
+  signal vga_vblank_pulse : std_logic;
+  signal vga_rdata        : std_logic_vector(31 downto 0);
+  signal vga_ack          : std_logic := '0';
+
 begin
 
-  irq_pulses <= (uart_pulse, button_pulse);
+  irq_pulses <= (vga_vblank_pulse, uart_pulse, button_pulse);
 
   sel_rom  <= '1' when xbus_adr_sig(31 downto 28) = x"0" else
               '0';
@@ -140,12 +158,11 @@ begin
   end process reset_proc;
 
   -- =========================================================================
-  -- NEORV32 Unified Flat Bus Interface Assignments (Strict Specification Match)
+  -- NEORV32 Unified Flat Bus Interface Assignments
   -- =========================================================================
-  -- Cast incoming types to local variables; values remain stable throughout the cycle
   cpu_bram_addr  <= std_logic_vector(xbus_adr_sig);
   cpu_bram_wdata <= std_logic_vector(xbus_dat_wdata_sig);
-  -- Instance of your new helper entity
+
   button_debounce_inst : entity lib.button_pulse_detector
     port map (
       clk_i   => clk,
@@ -184,6 +201,55 @@ begin
       trace_cpu0_o => trace
     );
 
+  pixel_clock_unit : entity lib.pixel_clock
+    port map (
+      clk     => clk,
+      reset   => system_reset,
+      clk_out => pixel_pulse
+    );
+
+  -- =========================================================================
+  -- VGA Display Engine Subsystem Configuration (MMIO Block 0x1XXXXXXX)
+  -- =========================================================================
+  vga_engine : entity lib.vga_controller
+    port map (
+      clk          => clk,
+      system_reset => system_reset,
+
+      wb_adr_i => std_logic_vector(xbus_adr_sig),
+      wb_dat_i => std_logic_vector(xbus_dat_wdata_sig),
+      wb_dat_o => vga_rdata,
+      wb_we_i  => xbus_we_sig,
+      wb_sel_i => std_logic_vector(xbus_sel_sig),
+      wb_stb_i => xbus_stb_sig and sel_vram,
+      wb_cyc_i => xbus_cyc_sig and sel_vram,
+      wb_ack_o => vga_ack,
+
+      pixel_clock => pixel_pulse,
+      irq_vblank  => vga_vblank_pulse,
+      vga_red     => vga_red_sig,
+      vga_green   => vga_green_sig,
+      vga_blue    => vga_blue_sig,
+      h_sync      => h_sync,
+      v_sync      => v_sync
+    );
+
+  -- Slice internal VGA color vectors to top-level single-bit output ports
+  vga_red_3 <= vga_red_sig(3);
+  vga_red_2 <= vga_red_sig(2);
+  vga_red_1 <= vga_red_sig(1);
+  vga_red_0 <= vga_red_sig(0);
+
+  vga_green_3 <= vga_green_sig(3);
+  vga_green_2 <= vga_green_sig(2);
+  vga_green_1 <= vga_green_sig(1);
+  vga_green_0 <= vga_green_sig(0);
+
+  vga_blue_3 <= vga_blue_sig(3);
+  vga_blue_2 <= vga_blue_sig(2);
+  vga_blue_1 <= vga_blue_sig(1);
+  vga_blue_0 <= vga_blue_sig(0);
+
   boot_rom_ram : entity lib.cpu_bram
     generic map (
       mem_size_bytes => 32768,
@@ -201,14 +267,6 @@ begin
       wb_cyc_i => xbus_cyc_sig and sel_rom,
       wb_ack_o => cpu_bram_ack
     );
-
-  pixel_clock_unit : entity lib.pixel_clock
-    port map (
-      clk     => clk,
-      reset   => system_reset,
-      clk_out => pixel_clock
-    );
-
 
   uart_sub_peripheral : entity lib.uart_wb
     port map (
@@ -307,6 +365,12 @@ begin
         xbus_ack_sig       <= cpu_bram_ack;
         xbus_dat_rdata_sig <= cpu_bram_rdata;
 
+      -- vga configuration peripheral
+      when x"1" =>
+
+        xbus_ack_sig       <= vga_ack;
+        xbus_dat_rdata_sig <= vga_rdata;
+
       -- uart peripheral
       when x"2" =>
 
@@ -319,7 +383,7 @@ begin
         xbus_ack_sig       <= led_ack;
         xbus_dat_rdata_sig <= led_rdata;
 
-      -- Interrupt controler
+      -- Interrupt controller
       when x"8" =>
 
         xbus_ack_sig       <= irq_ack;

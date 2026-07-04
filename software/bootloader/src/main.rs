@@ -3,7 +3,7 @@
 #![feature(abi_riscv_interrupt)]
 use core::arch::global_asm;
 use pac::println;
-use pac::set_leds;
+use pac::leds::set_leds;
 use pac::uart::read_char;
 use pac::uart::uart_putchar;
 use pac::wdt::watchdog_feed;
@@ -24,7 +24,7 @@ const ERR_BAD_CHECKSUM: u32 = 0x200; // LED 9 on: Checksum mismatch
 const ERR_UNKNOWN_CMD: u32 = 0x400; // LED 10 on: Unknown protocol command
 
 const APP_START_ADDRESS: *mut u8 = 0x0000_1000 as *mut u8;
-const MAX_APP_SIZE: usize = 12 * 1024; // 12 KB
+const MAX_APP_SIZE: usize = 28 * 1024; // 12 KB
 
 // Protocol Constants
 const SYNC_BYTE: u8 = 0xAA;
