@@ -80,6 +80,7 @@
           ++ riscvToolchain;
 
           buildInputs = with pkgs; [
+			tio
             glib
             vulkan-loader
             # FIXED: Using the modern, flattened naming structure 
@@ -90,6 +91,7 @@
           ];
 
           shellHook = ''
+			${builtins.readFile ./bin/fpga-utils.sh}
             echo "================================================================="
             echo " 🦀 Rust (via toolchain.toml) + 🖥️ Native GCC + 🛠️ RISC-V Cross GCC"
             echo " Available Python libraries: NumPy, Pillow, VSG (VHDL Style Guide)"
