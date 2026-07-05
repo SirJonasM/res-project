@@ -1,17 +1,17 @@
----
-
-### Updated `README.md`
 # FPGA Game Project & NeoV32 Bootloader
 
 This repository contains a hardware/software co-design for an FPGA-based game engine limited to **36 Kb BRAM**. To bypass memory constraints, the project uses a custom video generator (Tilemap & Sprite engine) and a tiny Rust-based bootloader embedded directly within the FPGA bitstream.
+
+All orchestration—from building software targets to hardware synthesis, USB bridging, and serial flashing—is handled by our custom repository tool: `ent`.
 
 ---
 
 ## Prerequisites & Development Environment
 
-The entire toolchain (GHDL, NextPNR, Yosys, Rust RISC-V targets, OpenFPGALoader, Python dependencies) is fully managed via **Nix**. 
+The entire toolchain (GHDL, NextPNR, Yosys, Rust RISC-V targets, OpenFPGALoader, Python dependencies) is fully managed via **Nix**.
 
 To drop into the development shell with all required host tools:
+
 ```bash
 nix develop
 
@@ -21,15 +21,9 @@ nix develop
 
 Because the FPGA toolchain runs inside a Linux environment, WSL 2 requires an active USB bridge to communicate with your physical board (e.g., Digilent Basys3).
 
-1. **Install `usbipd-win` on Windows** via Administrator PowerShell:
-```powershell
-winget install usbipd
-
-```
-
-
-2. **Configure WSL Permissions (First-time setup inside Ubuntu):**
+1. **Configure WSL Permissions (First-time setup inside Ubuntu):**
 Ensure `udev` rules grant your user interface access to the FTDI JTAG chip:
+
 ```bash
 sudo nano /etc/udev/rules.d/99-ftdi.rules
 # Paste this line inside, then save and exit:
@@ -41,13 +35,11 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 
 ```
 
+2. **Attach the Hardware Device (Every session):**
+Connect your board via USB, then use `ent` to automate the `usbipd` attachment from the Windows host into your WSL environment:
 
-3. **Attach the Hardware Device (Every session):**
-Connect your board via USB, then open an **Administrator PowerShell on Windows** to forward the port:
-```powershell
-usbipd list
-# Find the BUSID for "USB Serial Converter A, USB Serial Converter B" (e.g., 4-7)
-usbipd attach --wsl --busid <BUSID>
+```bash
+ent attach
 
 ```
 
@@ -62,71 +54,75 @@ usbipd attach --wsl --busid <BUSID>
 * `pac / library` — Low-level hardware abstraction layer for the custom FPGA peripherals.
 
 
+* `scripts/` — Internal data translation and serial link helpers.
 
 ---
 
 ## Development Workflow
 
-The deployment workflow is split into two phases: **Hardware Synthesis** (infrequent) and **Application Upload** (frequent development loop).
+The deployment workflow is fully orchestrated by `ent`. You can manage targets individually or trigger the complete automation pipeline in a single command.
 
 ```
-1. Build Bootloader ➔ 2. Synthesize & Flash FPGA ➔ 3. Build App Bin ➔ 4. Stream via Serial
+ent clean ➔ ent build ➔ ent program ➔ ent flash ➔ ent connect
 
 ```
 
-### Phase 1: Hardware & Bootloader Generation
+### The All-in-One Lifecycle Command
 
-The bootloader must be compiled in `release` mode to fit into the initial BRAM allocation embedded inside the FPGA bitstream. The root-level orchestrator `Makefile` handles the execution pipeline across target Nix environments automatically.
+For a pristine full-stack deployment cycle (cleaning build caches, synthesizing the hardware bitstream, programming the JTAG, compiling/flashing the application, and launching the interactive serial console), simply run:
 
-1. **Synthesize and Generate Bitstream:**
-Compiles the local Rust bootloader project, processes the flat binary image into an FPGA-ready hex format, and runs synthesis tools:
 ```bash
-make
+ent cycle
 
 ```
 
+### Granular Execution Phases
+
+#### Phase 1: Hardware & Bootloader Generation
+
+The bootloader must be compiled in `release` mode to fit into the initial BRAM allocation embedded inside the FPGA bitstream.
+
+1. **Synthesize the Infrastructure:**
+Compiles the bootloader target, converts it to Intel Hex format, and runs synthesis tools:
+
+```bash
+ent build hardware
+
+```
 
 2. **Run Simulations & Testing:**
-Routes simulation validation checks through the openXC7 framework:
+Routes verification simulation tests through the toolchain shell:
+
 ```bash
-make test
+ent test
 
 ```
 
+3. **Program the FPGA Bitstream:**
+Flashes the synthesized hardware configuration image onto the board via JTAG:
 
-3. **Program the FPGA:**
-Flashes the generated bitstream directly onto the attached board over the shared JTAG channel:
 ```bash
-make program
+ent program
 
 ```
 
-### Phase 2: Application Development Loop
+#### Phase 2: Application Development Loop
 
-Once the hardware and bootloader are flashed onto the FPGA, you do not need to re-synthesize the bitstream to update your game. You simply stream the application binary over UART.
+Once the hardware and bootloader are flashed onto the FPGA, you do not need to re-synthesize the bitstream to iterate on your game. You simply stream the application binary over UART.
 
-1. **Build the Game Application:**
-*(Crucial to use `--release` due to the strict 36 Kb memory limit)*
+1. **Build and Flash the Game Application:**
+Compiles the application workspace using aggressive release optimizations and streams the binary image directly to the board over the serial wire:
+
 ```bash
-cd software
-cargo build --release -p application
+ent flash
 
 ```
 
+2. **Connect to the Console:**
+Open an interactive UART monitoring session via `tio` to view game diagnostics or interact with console utilities:
 
-2. **Extract the Raw Binary:**
-Convert the compiled ELF target into a flat binary image at the project root:
 ```bash
-cargo objcopy -p application --release -- -O binary ../app.bin
-cd ..
-
-```
-
-
-3. **Upload and Execute:**
-Run the Python deployment script to send `app.bin` over the serial interface. The embedded bootloader will catch the binary, load it into the remaining RAM, and drop you directly into an interactive UART session:
-```bash
-python pyserial.py
+ent connect
 
 ```
 
@@ -134,9 +130,7 @@ python pyserial.py
 
 ## Important Memory Constraints
 
- [!WARNING]
- **Memory Warning:** The design operates with only 36 Kb of BRAM.
- * Always use `--release` for software builds.
- 
- 
-
+> ⚠️ **Memory Warning:** The hardware design operates with an absolute limit of **36 Kb of BRAM**.
+> * Never compile software components without the release profile optimization flag. `ent` enforces this under the hood during builds and flashes.
+> 
+>
