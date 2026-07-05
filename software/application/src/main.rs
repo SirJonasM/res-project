@@ -1,9 +1,9 @@
 #![no_std]
 #![no_main]
 #![feature(abi_riscv_interrupt)]
-mod interrupts;
 pub extern crate panic_application;
 
+mod interrupts;
 
 use core::arch::global_asm;
 use pac::println;
@@ -157,6 +157,7 @@ impl App {
         self.player.move_player();
     }
     fn player_jump(&mut self) {
+        println!("Player jumped");
         self.player.speed = 1.0;
     }
     fn start_level(&mut self) {}

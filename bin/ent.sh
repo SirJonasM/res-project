@@ -126,8 +126,12 @@ _clean-app-raw() {
 }
 
 _flash-app-raw() {
-    run-task "Opening serial link on /dev/ttyUSB1" true
     run-task "Uploading binary chunks over serial" python3 "$ROOT/scripts/pyserial.py" "$BUILD_DIR/app.bin"
+}
+
+
+_program-fpga-raw() {
+    run-task "Programming Bitstream via JTAG" run-toolchain make -C "$ROOT/hardware" program
 }
 
 # --- Standalone Target Commands (Used by direct CLI invokations) ---
@@ -181,11 +185,12 @@ connect-uart() {
         exit 1
     fi
     log-step "Connecting UART console via $DEVICE..."
-    exec tio -b 115200 -d 8 -p even "$DEVICE"
+    exec tio -b 115200 -d 8 -p none --stopbits 1 "$DEVICE" 
 }
 
 flash-app() {
-    _build-app-raw
+    build-app
+	_program-fpga-raw
     log-step "Uploading Application image over serial connection:"
     local DEPTH=$((DEPTH + 1))
     _flash-app-raw

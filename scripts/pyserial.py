@@ -3,6 +3,7 @@ import sys
 import struct
 import serial
 
+
 def send_packet(ser, cmd, offset, payload=b''):
     length = len(payload)
     header = struct.pack(">BHH", cmd, length, offset)
@@ -28,11 +29,13 @@ def main():
         sys.exit(3) # File missing
 
     try:
+        # Configuration updated to match: tio -b 115200 -d 8 -p none --stopbits 1
         ser = serial.Serial(
             port='/dev/ttyUSB1', 
             baudrate=115200, 
-            parity=serial.PARITY_EVEN, 
+            parity=serial.PARITY_NONE,    # Changed from EVEN to NONE
             bytesize=serial.EIGHTBITS, 
+            stopbits=serial.STOPBITS_ONE, # Explicitly configured to 1 stop bit
             timeout=1
         )
     except Exception:

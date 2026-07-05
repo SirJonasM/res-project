@@ -45,7 +45,7 @@ unsafe fn handle_external_interrupts() {
     if (status & IRQ_MASK_UART) != 0
         && let Some(c) = read_char()
     {
-        print!("{c}");
+        print!("{}", c as char);
     }
     if (status & IRQ_MASK_VGA) != 0 {
         let event = GameEvent::VBlank;
