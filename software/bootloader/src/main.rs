@@ -11,6 +11,8 @@ use pac::wdt::watchdog_init;
 use riscv::register::mstatus;
 use riscv::register::mtvec;
 
+pub extern crate panic_bootloader;
+
 global_asm!(include_str!("start.S"));
 
 // Constants for our protocol

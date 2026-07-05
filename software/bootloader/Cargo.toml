@@ -7,3 +7,4 @@ build = "build.rs"
 [dependencies]
 pac = {path = "../pac", default-features = false}
 riscv = {version = "0.16.1", default-features = false}
+panic-bootloader = {path="../panic-bootloader"}

@@ -2,6 +2,8 @@
 #![no_main]
 #![feature(abi_riscv_interrupt)]
 mod interrupts;
+pub extern crate panic_application;
+
 
 use core::arch::global_asm;
 use pac::println;

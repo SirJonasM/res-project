@@ -7,3 +7,4 @@ build = "build.rs"
 [dependencies]
 pac = { path="../pac" , features = ["application"]}
 riscv = { version = "0.16.1", default-features = false }
+panic-application = {path="../panic-application"}

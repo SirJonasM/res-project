@@ -13,8 +13,8 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
 
-		fpga-cmd = pkgs.writeShellScriptBin "fpga" ''
-		  exec ${./bin/fpga-utils.sh} "$@"
+		ent-cmd = pkgs.writeShellScriptBin "ent" ''
+		  exec ${./bin/ent.sh} "$@"
 		'';
 
         # 1. Parse the Rust toolchain straight from your project's configuration file
@@ -84,7 +84,7 @@
           ++ riscvToolchain;
 
           buildInputs = with pkgs; [
-			fpga-cmd
+			ent-cmd
 			tio
             glib
             vulkan-loader
@@ -96,7 +96,7 @@
           ];
 
           shellHook = ''
-			  fpga help
+			  ent help
           '';
         };
       });

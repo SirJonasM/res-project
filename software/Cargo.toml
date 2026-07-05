@@ -3,8 +3,10 @@ resolver = "3"
 members = [
     "bootloader",
     "application",
-	"protocol"
-, "pac"]
+	"pac", 
+	"panic-application", 
+	"panic-bootloader"
+  ]
 
 # Shared build configuration across all embedded crates
 [profile.release]
