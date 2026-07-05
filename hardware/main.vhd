@@ -253,7 +253,7 @@ begin
   boot_rom_ram : entity lib.cpu_bram
     generic map (
       mem_size_bytes => 32768,
-      hex_file_name  => "firmware.hex"
+      hex_file_name  => "../build/firmware.hex"
     )
     port map (
       clk_i    => clk,

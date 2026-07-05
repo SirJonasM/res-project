@@ -83,8 +83,12 @@ test:
 	@echo "Simulation complete. Waveform saved to ${SIM_DIR}/waveform.vcd"
 
 # --- Utilities ---
-program: ${BUILD_DIR}/${PROJECT}.bit
-	openFPGALoader ${JTAG_LINK} --bitstream $<
+program:
+	@if [ ! -f "${BUILD_DIR}/${PROJECT}.bit" ]; then \
+		echo "❌ Error: Bitstream artifact missing (${BUILD_DIR}/${PROJECT}.bit). Run 'fpga build' first."; \
+		exit 1; \
+	fi
+	openFPGALoader ${JTAG_LINK} --bitstream ${BUILD_DIR}/${PROJECT}.bit
 
 clean:
 	@rm -rf ${BUILD_DIR} ${SIM_DIR}

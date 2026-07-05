@@ -13,6 +13,10 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
 
+		fpga-cmd = pkgs.writeShellScriptBin "fpga" ''
+		  exec ${./bin/fpga-utils.sh} "$@"
+		'';
+
         # 1. Parse the Rust toolchain straight from your project's configuration file
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./software/rust-toolchain.toml;
 
@@ -80,6 +84,7 @@
           ++ riscvToolchain;
 
           buildInputs = with pkgs; [
+			fpga-cmd
 			tio
             glib
             vulkan-loader
@@ -91,13 +96,7 @@
           ];
 
           shellHook = ''
-			${builtins.readFile ./bin/fpga-utils.sh}
-            echo "================================================================="
-            echo " 🦀 Rust (via toolchain.toml) + 🖥️ Native GCC + 🛠️ RISC-V Cross GCC"
-            echo " Available Python libraries: NumPy, Pillow, VSG (VHDL Style Guide)"
-            echo " Cross-Compiler Toolchain active: riscv64-none-elf-gcc"
-            echo "   -> Remember to pass '-march=rv32i -mabi=ilp32' for PicoRV32"
-            echo "================================================================="
+			  fpga help
           '';
         };
       });
