@@ -56,7 +56,7 @@ architecture behavioral of vga_controller is
   -- Memory Mapped Register (Holds 12-bit RGB color: Bits 11:8 R, 7:4 G, 3:0 B)
   signal bg_color_reg : std_logic_vector(11 downto 0) := (others => '0');
 
-  -- 
+  -- Neue Register hinzufügen für Position
   signal player_x_reg : unsigned(31 downto 0) := to_unsigned(100, 32);
   signal player_y_reg : unsigned(31 downto 0) := to_unsigned(370, 32);
 
@@ -70,6 +70,7 @@ begin
 
   -- =========================================================================
   -- CPU MMIO Interface (Wishbone Protocol)
+  -- anhängig von der Adresse 
   -- =========================================================================
   process (clk, system_reset) is
   begin
@@ -109,6 +110,7 @@ begin
     end if;
   end process;
 
+    -- Leseprozess, CPU bekommt je nach Adresse den passenden Wert zurück
     process (all) is
     begin
       case wb_adr_i(5 downto 2) is

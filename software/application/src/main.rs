@@ -7,6 +7,7 @@ mod interrupts;
 
 use core::arch::global_asm;
 use pac::println;
+use pac::vga::{set_bg_color, set_player_pos, set_player_y}; 
 
 use crate::interrupts::setup_interrupts;
 
@@ -122,6 +123,9 @@ struct Player {
 pub extern "C" fn main() -> ! {
     println!("Hello World");
     setup_interrupts();
+
+    set_bg_color(0xB, 0xC, 0xF);
+    set_player_pos(100, 300);
 
     let mut app = App {
         player: Player {
