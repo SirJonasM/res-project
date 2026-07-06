@@ -48,7 +48,6 @@ architecture behavioral of vga_controller is
   signal hsync_reg : std_logic_vector(3 downto 0)  := (others => '1');
   signal vsync_reg : std_logic_vector(3 downto 0)  := (others => '1');
   signal blank_reg : std_logic_vector(3 downto 0)  := (others => '0');
-  signal vga_out   : std_logic_vector(11 downto 0);
   
   -- Interrupt Tracker
   signal irq_vblank_i : std_logic := '0';
@@ -259,11 +258,5 @@ begin
     end if;
   end process;
 
-  -- Assign Physical Output Pins
-  vga_red   <= vga_out(11 downto 8);
-  vga_green <= vga_out(7 downto 4);
-  vga_blue  <= vga_out(3 downto 0);
-  h_sync    <= hsync_reg(3);
-  v_sync    <= vsync_reg(3);
 
 end architecture behavioral;
