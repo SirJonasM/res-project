@@ -56,6 +56,13 @@ architecture behavioral of vga_controller is
   -- Memory Mapped Register (Holds 12-bit RGB color: Bits 11:8 R, 7:4 G, 3:0 B)
   signal bg_color_reg : std_logic_vector(11 downto 0) := (others => '0');
 
+  -- 
+  signal player_x_reg : unsigned(31 downto 0) := to_unsigned(100, 32);
+  signal player_y_reg : unsigned(31 downto 0) := to_unsigned(370, 32);
+
+  constant PLAYER_SIZE : integer := 30;
+  constant GROUND_Y    : integer := 400;
+
 begin
 
   -- Drive the physical interrupt output pin
@@ -67,33 +74,102 @@ begin
   process (clk, system_reset) is
   begin
     if system_reset = '1' then
-      bg_color_reg <= (others => '0');
+      player_x_reg <= to_unsigned(100, 32);
+      player_y_reg <= to_unsigned(370, 32);
+      bg_color_reg <= x"BCF";
       wb_ack_o     <= '0';
+
     elsif rising_edge(clk) then
       wb_ack_o <= '0';
-      
-      -- Handle transaction requests
+
       if (wb_cyc_i = '1' and wb_stb_i = '1') then
-        wb_ack_o <= '1'; -- Single cycle acknowledgment
-        
+        wb_ack_o <= '1';
+
         if wb_we_i = '1' then
-          -- Write to register (Assuming byte/word updates update the whole value)
-          bg_color_reg <= wb_dat_i(11 downto 0);
+          case wb_adr_i(5 downto 2) is
+
+            -- 0x1000_0000
+            when "0000" =>
+              player_x_reg <= unsigned(wb_dat_i);
+
+            -- 0x1000_0004
+            when "0001" =>
+              player_y_reg <= unsigned(wb_dat_i);
+
+            -- 0x1000_0008
+            when "0010" =>
+              bg_color_reg <= wb_dat_i(11 downto 0);
+
+            when others =>
+              null;
+
+          end case;
         end if;
       end if;
     end if;
   end process;
 
-  -- Read bus outputs the current background color padded with zeros
-  wb_dat_o <= std_logic_vector(resize(unsigned(bg_color_reg), 32));
+    process (all) is
+    begin
+      case wb_adr_i(5 downto 2) is
 
+        when "0000" =>
+          wb_dat_o <= std_logic_vector(player_x_reg);
+
+        when "0001" =>
+          wb_dat_o <= std_logic_vector(player_y_reg);
+
+        when "0010" =>
+          wb_dat_o <= x"00000" & bg_color_reg;
+
+        when others =>
+          wb_dat_o <= (others => '0');
+
+      end case;
+    end process;
 
   -- =========================================================================
   -- Video Timing and Rendering Engine (Pixel Clock Domain)
   -- =========================================================================
   
   -- Drive color from the MMIO register
-  color <= bg_color_reg;
+    process (all) is
+    variable sx : integer;
+    variable sy : integer;
+    variable px : integer;
+    variable py : integer;
+  begin
+    color <= bg_color_reg;
+
+    px := to_integer(player_x_reg(9 downto 0));
+    py := to_integer(player_y_reg(9 downto 0));
+
+    -- active screen area in his VGA timing:
+    -- h_cnt 144..783 => x 0..639
+    -- v_cnt 35..514  => y 0..479
+    if (h_cnt >= 144 and h_cnt < 784 and v_cnt >= 35 and v_cnt < 515) then
+
+      sx := h_cnt - 144;
+      sy := v_cnt - 35;
+
+      -- background
+      color <= bg_color_reg;
+
+      -- ground
+      if sy >= GROUND_Y then
+        color <= x"666";
+      end if;
+
+      -- player cube
+      if (sx >= px and sx < px + PLAYER_SIZE and
+          sy >= py and sy < py + PLAYER_SIZE) then
+        color <= x"0FF";
+      end if;
+
+    else
+      color <= x"000";
+    end if;
+  end process;
 
   -- Generate structural timing Sync Assertions
   hsync_i <= '0' when (h_cnt < 96) else '1';
