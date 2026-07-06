@@ -1,0 +1,5 @@
+{
+    "vhdlls.server.environment": {
+        "VHDL_LS_CONFIG": "§{workspaceFolder}/hardware/vhdl_ls.toml"
+    }
+}
