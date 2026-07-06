@@ -1,8 +1,13 @@
 [libraries]
-neorv32.files = ["main.vhd", "risc_core/rtl/core/*.vhd"]
-lib.files = ["main.vhd", "src/*.vhd"]
 
+lib.files = [
+  "main.vhd",
+  "src/*.vhd",
+  "src/**/*.vhd",
+]
 
-
-
-
+neorv32.files = [
+  "risc_core/rtl/core/*.vhd",
+  "risc_core/rtl/test_setups/*.vhd",
+  "risc_core/rtl/verilog/*.vhd",
+]
