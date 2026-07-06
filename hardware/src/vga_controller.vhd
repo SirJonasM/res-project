@@ -63,6 +63,11 @@ architecture behavioral of vga_controller is
   constant PLAYER_SIZE : integer := 30;
   constant GROUND_Y    : integer := 400;
 
+  -- RGB, HSync und VSync sauber mit pixel_clock registriert werden
+  type color_pipe_t is array (0 to 3) of std_logic_vector(11 downto 0);
+  signal color_pipe    : color_pipe_t := (others => (others => '0'));
+  signal color_delayed : std_logic_vector(11 downto 0);
+
 begin
 
   -- Drive the physical interrupt output pin
@@ -141,7 +146,6 @@ begin
     variable px : integer;
     variable py : integer;
   begin
-    color <= bg_color_reg;
 
     px := to_integer(player_x_reg(9 downto 0));
     py := to_integer(player_y_reg(9 downto 0));
@@ -222,13 +226,36 @@ begin
     end if;
   end process;
 
-  -- Display Blanking Multi-plexer
-  process (color, blank_reg) is
+  -- 
+  process (pixel_clock) is
   begin
-    if (blank_reg(3) = '1') then
-      vga_out <= (others => '0');
-    else
-      vga_out <= color; 
+    if rising_edge(pixel_clock) then
+      color_pipe(0) <= color;
+      color_pipe(1) <= color_pipe(0);
+      color_pipe(2) <= color_pipe(1);
+      color_pipe(3) <= color_pipe(2);
+    end if;
+  end process;
+
+  color_delayed <= color_pipe(3);
+
+  -- Display Blanking Multi-plexer
+  -- 3. Final Output MUST be clocked to eliminate combinatorial glitches:
+  process (pixel_clock) is
+  begin
+    if rising_edge(pixel_clock) then
+      if (blank_reg(3) = '1') then
+        vga_red   <= (others => '0');
+        vga_green <= (others => '0');
+        vga_blue  <= (others => '0');
+      else
+        -- Make sure 'color' here matches the 4-cycle delay pipeline
+        vga_red   <= color_delayed(11 downto 8);
+        vga_green <= color_delayed(7 downto 4);
+        vga_blue  <= color_delayed(3 downto 0);
+      end if;
+      h_sync <= hsync_reg(3);
+      v_sync <= vsync_reg(3);
     end if;
   end process;
 
