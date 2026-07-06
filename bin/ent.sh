@@ -2,18 +2,26 @@
 
 # Global UI Control Flags
 VERBOSE=false
+VERSION=false
 LOG_FILE="/dev/null"
 DEPTH=0 
 
 SUBCOMMANDS=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --version) VERSION=true; shift ;;
         -v|--verbose) VERBOSE=true; shift ;;
         -l|--log-file) LOG_FILE="$2"; shift 2 ;;
         *) SUBCOMMANDS+=("$1"); shift ;;
     esac
 done
 set -- "${SUBCOMMANDS[@]}"
+
+# Handle version string print request early
+if [ "$VERSION" = true ]; then
+    echo "ent // Forest-Orchestrated Hardware Utilities - version 0.1.0"
+    exit 0
+fi
 
 find-root() { git rev-parse --show-toplevel 2>/dev/null || pwd; }
 ROOT=$(find-root)
@@ -129,7 +137,6 @@ _flash-app-raw() {
     run-task "Uploading binary chunks over serial" python3 "$ROOT/scripts/pyserial.py" "$BUILD_DIR/app.bin"
 }
 
-
 _program-fpga-raw() {
     run-task "Programming Bitstream via JTAG" run-toolchain make -C "$ROOT/hardware" program
 }
@@ -190,7 +197,7 @@ connect-uart() {
 
 flash-app() {
     build-app
-	_program-fpga-raw
+    _program-fpga-raw
     log-step "Uploading Application image over serial connection:"
     local DEPTH=$((DEPTH + 1))
     _flash-app-raw
@@ -264,8 +271,9 @@ help-fpga() {
     echo "  ent // Forest-Orchestrated Hardware Utilities ($ROOT)"
     echo "=========================================================="
     echo "  Global Options:"
-    echo "    -v, --verbose      Stream raw tool outputs directly"
-    echo "    -l, --log-file F   Redirect detailed standard log traces to file F"
+    echo "    --version         Print build tool version"
+    echo "    -v, --verbose       Stream raw tool outputs directly"
+    echo "    -l, --log-file F    Redirect detailed standard log traces to file F"
     echo ""
     echo "  Commands:"
     echo "    ent build [sub]   - Shape targets: all, app, bootloader, or hardware"
