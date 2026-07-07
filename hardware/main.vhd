@@ -231,7 +231,9 @@ begin
       vga_green   => vga_green_sig,
       vga_blue    => vga_blue_sig,
       h_sync      => h_sync,
-      v_sync      => v_sync
+      v_sync      => v_sync,
+
+      jump_i => button_pulse
     );
 
   -- Slice internal VGA color vectors to top-level single-bit output ports

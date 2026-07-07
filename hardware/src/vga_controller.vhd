@@ -30,7 +30,10 @@ entity vga_controller is
     vga_green    : out   std_logic_vector(3 downto 0);
     vga_blue     : out   std_logic_vector(3 downto 0);
     h_sync       : out   std_logic;
-    v_sync       : out   std_logic
+    v_sync       : out   std_logic;
+
+    -- Game input
+    jump_i       : in    std_logic
   );
 end entity vga_controller;
 
@@ -67,15 +70,24 @@ architecture behavioral of vga_controller is
   signal color_pipe    : color_pipe_t := (others => (others => '0'));
   signal color_delayed : std_logic_vector(11 downto 0);
 
+  -- game tick
   signal game_tick    : std_logic := '0';
   signal tick_counter : integer range 0 to 1666665 := 0;
 
+  -- moving obstacle
   constant OBSTACLE_WIDTH  : integer := 30;
   constant OBSTACLE_HEIGHT : integer := 30;
   constant OBSTACLE_Y      : integer := 370;
   constant OBSTACLE_SPEED  : integer := 3;
-
   signal obstacle_x : integer range -50 to 700 := 640;
+
+  -- jumping cube
+  signal velocity_y   : integer range -20 to 20 := 0;
+  signal jump_request : std_logic := '0'; -- Buttonpress speichern, weil bei gametick wird vepasst
+
+  constant PLAYER_GROUND_Y : integer := 370;
+  constant JUMP_STRENGTH   : integer := -12;
+  constant GRAVITY         : integer := 1;
 
 begin
 
@@ -122,15 +134,25 @@ begin
   -- anhängig von der Adresse 
   -- =========================================================================
   process (clk, system_reset) is
+    variable y_next : integer;
+    variable v_next : integer;
   begin
     if system_reset = '1' then
       player_x_reg <= to_unsigned(100, 32);
       player_y_reg <= to_unsigned(370, 32);
       bg_color_reg <= x"BCF";
       wb_ack_o     <= '0';
+      velocity_y   <= 0;
+      jump_request <= '0';
 
     elsif rising_edge(clk) then
       wb_ack_o <= '0';
+
+      -- latch short button pulse until next game tick
+      if jump_i = '1' then
+        jump_request <= '1';
+      end if;
+
 
       if (wb_cyc_i = '1' and wb_stb_i = '1') then
         wb_ack_o <= '1';
@@ -155,6 +177,46 @@ begin
 
           end case;
         end if;
+      end if;
+
+      -- Hardware player physics
+      if game_tick = '1' then
+        y_next := to_integer(player_y_reg(9 downto 0));
+        v_next := velocity_y;
+
+        -- jump only from ground
+        if (jump_request = '1' or jump_i = '1') and y_next = PLAYER_GROUND_Y then
+          v_next := JUMP_STRENGTH;
+        else
+          v_next := velocity_y + GRAVITY;
+        end if;
+
+        -- limit velocity
+        if v_next > 20 then
+          v_next := 20;
+        elsif v_next < -20 then
+          v_next := -20;
+        end if;
+
+        y_next := y_next + v_next;
+
+        -- ground collision
+        if y_next > PLAYER_GROUND_Y then
+          y_next := PLAYER_GROUND_Y;
+          v_next := 0;
+        end if;
+
+        -- top screen limit
+        if y_next < 0 then
+          y_next := 0;
+          v_next := 0;
+        end if;
+
+        player_y_reg <= to_unsigned(y_next, 32);
+        velocity_y   <= v_next;
+
+        -- consume jump request
+        jump_request <= '0';
       end if;
     end if;
   end process;

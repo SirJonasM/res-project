@@ -136,7 +136,7 @@ pub extern "C" fn main() -> ! {
         speed: Speed::Low,
     };
 
-    loop {
+    loop {/*
         let event = GAME_QUEUE.lock(|queue| queue.pop());
         match event {
             Some(GameEvent::VBlank) => app.next_frame(),
@@ -144,7 +144,7 @@ pub extern "C" fn main() -> ! {
             Some(GameEvent::LevelStart) => app.start_level(),
             Some(GameEvent::PlayerDeath) => app.player_died(),
             None => {}
-        };
+        };*/
         pac::wdt::watchdog_feed();
     } 
 let mut y: i32 = 370;
