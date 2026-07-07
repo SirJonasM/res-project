@@ -67,10 +67,55 @@ architecture behavioral of vga_controller is
   signal color_pipe    : color_pipe_t := (others => (others => '0'));
   signal color_delayed : std_logic_vector(11 downto 0);
 
+  signal game_tick    : std_logic := '0';
+  signal tick_counter : integer range 0 to 1666665 := 0;
+
+  constant OBSTACLE_WIDTH  : integer := 30;
+  constant OBSTACLE_HEIGHT : integer := 30;
+  constant OBSTACLE_Y      : integer := 370;
+  constant OBSTACLE_SPEED  : integer := 3;
+
+  signal obstacle_x : integer range -50 to 700 := 640;
+
 begin
 
   -- Drive the physical interrupt output pin
   irq_vblank <= irq_vblank_i;
+
+  -- game tick
+  process (clk, system_reset) is
+  begin
+    if system_reset = '1' then
+      tick_counter <= 0;
+      game_tick    <= '0';
+
+    elsif rising_edge(clk) then
+      if tick_counter = 1666665 then
+        tick_counter <= 0;
+        game_tick    <= '1';
+      else
+        tick_counter <= tick_counter + 1;
+        game_tick    <= '0';
+      end if;
+    end if;
+  end process;
+
+  -- obstacle
+  process (clk, system_reset) is
+  begin
+    if system_reset = '1' then
+      obstacle_x <= 640;
+
+    elsif rising_edge(clk) then
+      if game_tick = '1' then
+        if obstacle_x > -OBSTACLE_WIDTH then
+          obstacle_x <= obstacle_x - OBSTACLE_SPEED;
+        else
+          obstacle_x <= 640;
+        end if;
+      end if;
+    end if;
+  end process;
 
   -- =========================================================================
   -- CPU MMIO Interface (Wishbone Protocol)
@@ -169,6 +214,12 @@ begin
       if (sx >= px and sx < px + PLAYER_SIZE and
           sy >= py and sy < py + PLAYER_SIZE) then
         color <= x"0FF";
+      end if;
+    
+      -- moving obstacle block
+      if (sx >= obstacle_x and sx < obstacle_x + OBSTACLE_WIDTH and
+          sy >= OBSTACLE_Y and sy < OBSTACLE_Y + OBSTACLE_HEIGHT) then
+        color <= x"F22";
       end if;
 
     else
