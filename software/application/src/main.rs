@@ -7,7 +7,7 @@ mod interrupts;
 
 use core::arch::global_asm;
 use pac::println;
-use pac::vga::{set_bg_color, set_player_pos, set_player_y}; 
+use pac::vga::{set_bg_color, set_player_pos, set_player_y, reset_game, read_game_over}; 
 
 use crate::interrupts::setup_interrupts;
 
@@ -126,6 +126,7 @@ pub extern "C" fn main() -> ! {
 
     set_bg_color(0xB, 0xC, 0xF);
     set_player_pos(100, 370);
+    reset_game();
 
     let mut app = App {
         player: Player {
@@ -136,7 +137,7 @@ pub extern "C" fn main() -> ! {
         speed: Speed::Low,
     };
 
-    loop {/*
+    /*loop {
         let event = GAME_QUEUE.lock(|queue| queue.pop());
         match event {
             Some(GameEvent::VBlank) => app.next_frame(),
@@ -144,11 +145,26 @@ pub extern "C" fn main() -> ! {
             Some(GameEvent::LevelStart) => app.start_level(),
             Some(GameEvent::PlayerDeath) => app.player_died(),
             None => {}
-        };*/
+        };
         pac::wdt::watchdog_feed();
-    } 
-let mut y: i32 = 370;
-let mut dir: i32 = -1;
+    } */
+
+    loop {
+    if read_game_over() {
+        println!("Game Over");
+
+        for _ in 0..20_000_000 {
+            core::hint::spin_loop();
+            pac::wdt::watchdog_feed();
+        }
+
+        reset_game();
+    }
+
+    pac::wdt::watchdog_feed();
+    }
+    let mut y: i32 = 370;
+    let mut dir: i32 = -1;
 
    /* loop {
     set_player_y(y as u32);

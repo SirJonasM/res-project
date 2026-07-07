@@ -3,6 +3,7 @@ use core::ptr::{read_volatile, write_volatile};
 const PLAYER_X: *mut u32 = 0x1000_0000 as *mut u32;
 const PLAYER_Y: *mut u32 = 0x1000_0004 as *mut u32;
 const BG_COLOR: *mut u32 = 0x1000_0008 as *mut u32;
+const CONTROL: *mut u32 = 0x1000_0010 as *mut u32;
 
 /// Sets player x-position
 pub fn set_player_x(x: u32) {
@@ -61,4 +62,17 @@ pub fn read_bg_color() -> (u8, u8, u8) {
     let b = (raw_color & 0xF) as u8;
 
     (r, g, b)
+}
+
+/// reset
+pub fn reset_game() {
+    unsafe {
+        write_volatile(CONTROL, 1);
+    }
+}
+
+pub fn read_game_over() -> bool {
+    unsafe {
+        (read_volatile(CONTROL) & 1) != 0
+    }
 }

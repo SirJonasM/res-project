@@ -89,9 +89,19 @@ architecture behavioral of vga_controller is
   constant JUMP_STRENGTH   : integer := -12;
   constant GRAVITY         : integer := 1;
 
-  -- signal collision
+  -- collision / reset
   signal side_collision : std_logic := '0';
   signal game_over : std_logic := '0';
+  signal game_reset_req : std_logic := '0';
+
+  --spike
+  constant SPIKE_WIDTH  : integer := 20;
+  constant SPIKE_HEIGHT : integer := 30;
+  constant SPIKE_Y      : integer := 370;
+  constant SPIKE_SPEED  : integer := 3;
+
+  signal spike_x : integer range -50 to 700 := 600;
+  signal spike_collision : std_logic := '0';
 
 begin
 
@@ -108,8 +118,39 @@ begin
     )
   else '0';
 
+  spike_collision <= '1' when
+    (
+      to_integer(player_x_reg(9 downto 0)) < spike_x + SPIKE_WIDTH and
+      to_integer(player_x_reg(9 downto 0)) + PLAYER_SIZE > spike_x and
+      to_integer(player_y_reg(9 downto 0)) < SPIKE_Y + SPIKE_HEIGHT and
+      to_integer(player_y_reg(9 downto 0)) + PLAYER_SIZE > SPIKE_Y + 8
+    )
+  else '0';
+
   -- Drive the physical interrupt output pin
   irq_vblank <= irq_vblank_i;
+
+  -- spike 
+  process (clk, system_reset) is
+  begin
+    if system_reset = '1' then
+      spike_x <= 600;
+
+    elsif rising_edge(clk) then
+
+      if game_reset_req = '1' then
+        spike_x <= 600;
+
+      elsif game_tick = '1' and game_over = '0' then
+        if spike_x > -SPIKE_WIDTH then
+          spike_x <= spike_x - SPIKE_SPEED;
+        else
+          spike_x <= 700;
+        end if;
+      end if;
+
+    end if;
+  end process;
 
   -- game tick
   process (clk, system_reset) is
@@ -136,13 +177,18 @@ begin
       obstacle_x <= 640;
 
     elsif rising_edge(clk) then
-      if game_tick = '1' and game_over = '0' then
+
+      if game_reset_req = '1' then
+        obstacle_x <= 640;
+
+      elsif game_tick = '1' and game_over = '0' then
         if obstacle_x > -OBSTACLE_WIDTH then
           obstacle_x <= obstacle_x - OBSTACLE_SPEED;
         else
           obstacle_x <= 640;
         end if;
       end if;
+
     end if;
   end process;
 
@@ -165,6 +211,7 @@ begin
 
     elsif rising_edge(clk) then
       wb_ack_o <= '0';
+      game_reset_req <= '0';
 
       -- latch short button pulse until next game tick
       if jump_i = '1' then
@@ -189,6 +236,17 @@ begin
             -- 0x1000_0008
             when "0010" =>
               bg_color_reg <= wb_dat_i(11 downto 0);
+
+            -- 0x1000_0010 CONTROL - zurücksetzen 
+            when "0100" =>
+              if wb_dat_i(0) = '1' then
+                player_x_reg <= to_unsigned(100, 32);
+                player_y_reg <= to_unsigned(370, 32);
+                velocity_y   <= 0;
+                game_reset_req <= '1';
+                game_over    <= '0';
+                jump_request <= '0';
+              end if;
 
             when others =>
               null;
@@ -245,7 +303,7 @@ begin
       end if;
 
       if game_tick = '1' and game_over = '0' then
-        if side_collision = '1' then
+        if side_collision = '1' or spike_collision = '1' then
           game_over <= '1';
         end if;
       end if;
@@ -267,6 +325,9 @@ begin
         when "0010" =>
           wb_dat_o <= x"00000" & bg_color_reg;
 
+        when "0100" =>
+          wb_dat_o <= (31 downto 1 => '0') & game_over;
+
         when others =>
           wb_dat_o <= (others => '0');
 
@@ -276,7 +337,6 @@ begin
   -- =========================================================================
   -- Video Timing and Rendering Engine (Pixel Clock Domain)
   -- =========================================================================
-  
   -- Drive color from the MMIO register
     process (all) is
     variable sx : integer;
@@ -320,6 +380,21 @@ begin
       if (sx >= obstacle_x and sx < obstacle_x + OBSTACLE_WIDTH and
           sy >= OBSTACLE_Y and sy < OBSTACLE_Y + OBSTACLE_HEIGHT) then
         color <= x"F22";
+      end if;
+
+      -- simple triangle spike
+      if (sx >= spike_x and sx < spike_x + SPIKE_WIDTH and
+          sy >= SPIKE_Y and sy < SPIKE_Y + SPIKE_HEIGHT) then
+
+        if sy >= SPIKE_Y + SPIKE_HEIGHT - (sx - spike_x) and
+          sx < spike_x + SPIKE_WIDTH / 2 then
+          color <= x"FF0";
+
+        elsif sy >= SPIKE_Y + SPIKE_HEIGHT - ((spike_x + SPIKE_WIDTH - 1) - sx) and
+              sx >= spike_x + SPIKE_WIDTH / 2 then
+          color <= x"FF0";
+        end if;
+
       end if;
 
     else
