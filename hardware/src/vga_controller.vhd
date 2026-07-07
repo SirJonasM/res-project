@@ -78,7 +78,7 @@ architecture behavioral of vga_controller is
   constant OBSTACLE_WIDTH  : integer := 30;
   constant OBSTACLE_HEIGHT : integer := 30;
   constant OBSTACLE_Y      : integer := 370;
-  constant OBSTACLE_SPEED  : integer := 3;
+  constant OBSTACLE_SPEED  : integer := 2;
   signal obstacle_x : integer range -50 to 700 := 640;
 
   -- jumping cube
@@ -89,7 +89,24 @@ architecture behavioral of vga_controller is
   constant JUMP_STRENGTH   : integer := -12;
   constant GRAVITY         : integer := 1;
 
+  -- signal collision
+  signal side_collision : std_logic := '0';
+  signal game_over : std_logic := '0';
+
 begin
+
+  -- collision
+  side_collision <= '1' when
+    (
+      -- X overlap
+      to_integer(player_x_reg(9 downto 0)) < obstacle_x + OBSTACLE_WIDTH and
+      to_integer(player_x_reg(9 downto 0)) + PLAYER_SIZE > obstacle_x and
+
+      -- Y overlap, aber nur wenn Player deutlich in die Seite reinragt
+      to_integer(player_y_reg(9 downto 0)) + PLAYER_SIZE > OBSTACLE_Y + 4 and
+      to_integer(player_y_reg(9 downto 0)) < OBSTACLE_Y + OBSTACLE_HEIGHT
+    )
+  else '0';
 
   -- Drive the physical interrupt output pin
   irq_vblank <= irq_vblank_i;
@@ -119,7 +136,7 @@ begin
       obstacle_x <= 640;
 
     elsif rising_edge(clk) then
-      if game_tick = '1' then
+      if game_tick = '1' and game_over = '0' then
         if obstacle_x > -OBSTACLE_WIDTH then
           obstacle_x <= obstacle_x - OBSTACLE_SPEED;
         else
@@ -144,6 +161,7 @@ begin
       wb_ack_o     <= '0';
       velocity_y   <= 0;
       jump_request <= '0';
+      game_over <= '0';
 
     elsif rising_edge(clk) then
       wb_ack_o <= '0';
@@ -180,18 +198,18 @@ begin
       end if;
 
       -- Hardware player physics
-      if game_tick = '1' then
+      if game_tick = '1' and game_over = '0' then
         y_next := to_integer(player_y_reg(9 downto 0));
         v_next := velocity_y;
 
-        -- jump only from ground
-        if (jump_request = '1' or jump_i = '1') and y_next = PLAYER_GROUND_Y then
+        -- jump only from ground or block
+        if (jump_request = '1' or jump_i = '1') and
+          (y_next = PLAYER_GROUND_Y or y_next = OBSTACLE_Y - PLAYER_SIZE) then
           v_next := JUMP_STRENGTH;
         else
           v_next := velocity_y + GRAVITY;
         end if;
 
-        -- limit velocity
         if v_next > 20 then
           v_next := 20;
         elsif v_next < -20 then
@@ -200,13 +218,22 @@ begin
 
         y_next := y_next + v_next;
 
-        -- ground collision
-        if y_next > PLAYER_GROUND_Y then
+        -- land on top of obstacle
+        if to_integer(player_x_reg(9 downto 0)) < obstacle_x + OBSTACLE_WIDTH and
+          to_integer(player_x_reg(9 downto 0)) + PLAYER_SIZE > obstacle_x and
+          velocity_y >= 0 and
+          to_integer(player_y_reg(9 downto 0)) + PLAYER_SIZE <= OBSTACLE_Y and
+          y_next + PLAYER_SIZE >= OBSTACLE_Y then
+
+          y_next := OBSTACLE_Y - PLAYER_SIZE;
+          v_next := 0;
+
+        -- land on ground
+        elsif y_next > PLAYER_GROUND_Y then
           y_next := PLAYER_GROUND_Y;
           v_next := 0;
         end if;
 
-        -- top screen limit
         if y_next < 0 then
           y_next := 0;
           v_next := 0;
@@ -214,10 +241,15 @@ begin
 
         player_y_reg <= to_unsigned(y_next, 32);
         velocity_y   <= v_next;
-
-        -- consume jump request
         jump_request <= '0';
       end if;
+
+      if game_tick = '1' and game_over = '0' then
+        if side_collision = '1' then
+          game_over <= '1';
+        end if;
+      end if;
+
     end if;
   end process;
 
@@ -275,7 +307,13 @@ begin
       -- player cube
       if (sx >= px and sx < px + PLAYER_SIZE and
           sy >= py and sy < py + PLAYER_SIZE) then
-        color <= x"0FF";
+
+        if game_over = '1' then
+          color <= x"F00";
+        else
+          color <= x"0FF";
+        end if;
+
       end if;
     
       -- moving obstacle block
