@@ -7,7 +7,7 @@ mod interrupts;
 
 use core::arch::global_asm;
 use pac::println;
-use pac::vga::{set_bg_color, set_player_pos, set_player_y, reset_game, read_game_over}; 
+use pac::vga::{set_bg_color, set_player_pos, set_player_y, reset_game, read_game_over, read_score}; 
 
 use crate::interrupts::setup_interrupts;
 
@@ -151,7 +151,8 @@ pub extern "C" fn main() -> ! {
 
     loop {
     if read_game_over() {
-        println!("Game Over");
+        let score = read_score();
+        println!("Game Over! Score: {}", score);
 
         for _ in 0..20_000_000 {
             core::hint::spin_loop();

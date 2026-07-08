@@ -103,6 +103,8 @@ architecture behavioral of vga_controller is
   signal spike_x : integer range -50 to 700 := 600;
   signal spike_collision : std_logic := '0';
 
+  signal score_reg : unsigned(31 downto 0) := (others => '0');
+
 begin
 
   -- collision
@@ -208,6 +210,7 @@ begin
       velocity_y   <= 0;
       jump_request <= '0';
       game_over <= '0';
+      score_reg <= (others => '0');
 
     elsif rising_edge(clk) then
       wb_ack_o <= '0';
@@ -237,7 +240,7 @@ begin
             when "0010" =>
               bg_color_reg <= wb_dat_i(11 downto 0);
 
-            -- 0x1000_0010 CONTROL - zurücksetzen 
+            -- 0x1000_0010 CONTROL - zurücksetzen reset_game()
             when "0100" =>
               if wb_dat_i(0) = '1' then
                 player_x_reg <= to_unsigned(100, 32);
@@ -246,6 +249,7 @@ begin
                 game_reset_req <= '1';
                 game_over    <= '0';
                 jump_request <= '0';
+                score_reg <= (others => '0');
               end if;
 
             when others =>
@@ -303,6 +307,7 @@ begin
       end if;
 
       if game_tick = '1' and game_over = '0' then
+        score_reg <= score_reg + 1;
         if side_collision = '1' or spike_collision = '1' then
           game_over <= '1';
         end if;
@@ -327,6 +332,9 @@ begin
 
         when "0100" =>
           wb_dat_o <= (31 downto 1 => '0') & game_over;
+
+        when "0101" =>
+          wb_dat_o <= std_logic_vector(score_reg);
 
         when others =>
           wb_dat_o <= (others => '0');
