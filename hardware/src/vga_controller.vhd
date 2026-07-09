@@ -104,6 +104,9 @@ architecture behavioral of vga_controller is
   signal spike_collision : std_logic := '0';
 
   signal score_reg : unsigned(31 downto 0) := (others => '0');
+  signal score_div_counter : integer range 0 to 59 := 0;
+
+  constant PROGRESS_MAX : integer := 600; -- ca. 10 Sekunden bei 60 Hz
 
 begin
 
@@ -210,7 +213,8 @@ begin
       velocity_y   <= 0;
       jump_request <= '0';
       game_over <= '0';
-      score_reg <= (others => '0');
+      score_reg         <= (others => '0');
+      score_div_counter <= 0;
 
     elsif rising_edge(clk) then
       wb_ack_o <= '0';
@@ -249,7 +253,8 @@ begin
                 game_reset_req <= '1';
                 game_over    <= '0';
                 jump_request <= '0';
-                score_reg <= (others => '0');
+                score_reg         <= (others => '0');
+                score_div_counter <= 0;
               end if;
 
             when others =>
@@ -307,7 +312,13 @@ begin
       end if;
 
       if game_tick = '1' and game_over = '0' then
-        score_reg <= score_reg + 1;
+        if score_div_counter = 59 then
+          score_div_counter <= 0;
+          score_reg <= score_reg + 1;
+        else
+          score_div_counter <= score_div_counter + 1;
+        end if;
+
         if side_collision = '1' or spike_collision = '1' then
           game_over <= '1';
         end if;
@@ -370,6 +381,17 @@ begin
       -- ground
       if sy >= GROUND_Y then
         color <= x"666";
+      end if;
+
+      -- progress bar background
+      if (sy >= 10 and sy < 18 and sx >= 20 and sx < 620) then
+        color <= x"333";
+      end if;
+
+      -- progress bar fill
+      if (sy >= 10 and sy < 18 and sx >= 20 and sx < 20 + to_integer(score_reg(15 downto 0)) and
+          to_integer(score_reg(15 downto 0)) < 600) then
+        color <= x"0F0";
       end if;
 
       -- player cube
