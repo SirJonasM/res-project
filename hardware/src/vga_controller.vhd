@@ -34,7 +34,6 @@ entity vga_controller is
 
     -- Game input
     jump_i       : in    std_logic;
-    jump_hold_i : in std_logic;
     start_i      : in    std_logic
   );
 end entity vga_controller;
@@ -313,7 +312,7 @@ begin
         v_next := velocity_y;
 
         -- jump only from ground or block
-        if (jump_request = '1' or jump_hold_i = '1') and
+        if (jump_request = '1' or jump_i = '1') and
           (y_next = PLAYER_GROUND_Y or y_next = OBSTACLE_Y - PLAYER_SIZE) then
           v_next := JUMP_STRENGTH;
         else
