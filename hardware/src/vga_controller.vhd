@@ -33,7 +33,9 @@ entity vga_controller is
     v_sync       : out   std_logic;
 
     -- Game input
-    jump_i       : in    std_logic
+    jump_i       : in    std_logic;
+    jump_hold_i : in std_logic;
+    start_i      : in    std_logic
   );
 end entity vga_controller;
 
@@ -103,10 +105,16 @@ architecture behavioral of vga_controller is
   signal spike_x : integer range -50 to 700 := 600;
   signal spike_collision : std_logic := '0';
 
+  -- score
   signal score_reg : unsigned(31 downto 0) := (others => '0');
   signal score_div_counter : integer range 0 to 59 := 0;
 
-  constant PROGRESS_MAX : integer := 600; -- ca. 10 Sekunden bei 60 Hz
+  -- speed
+  signal speed_reg : integer range 1 to 5 := 3;
+
+  type game_state_t is (MENU, RUNNING, GAME_OVER_STATE);
+  signal game_state : game_state_t := MENU;
+
 
 begin
 
@@ -146,11 +154,11 @@ begin
       if game_reset_req = '1' then
         spike_x <= 600;
 
-      elsif game_tick = '1' and game_over = '0' then
+      elsif game_tick = '1' and game_state = RUNNING then
         if spike_x > -SPIKE_WIDTH then
-          spike_x <= spike_x - SPIKE_SPEED;
+          spike_x <= spike_x - speed_reg;
         else
-          spike_x <= 700;
+          spike_x <= 600;
         end if;
       end if;
 
@@ -186,9 +194,9 @@ begin
       if game_reset_req = '1' then
         obstacle_x <= 640;
 
-      elsif game_tick = '1' and game_over = '0' then
+      elsif game_tick = '1' and game_state = RUNNING then
         if obstacle_x > -OBSTACLE_WIDTH then
-          obstacle_x <= obstacle_x - OBSTACLE_SPEED;
+          obstacle_x <= obstacle_x - speed_reg;
         else
           obstacle_x <= 640;
         end if;
@@ -215,14 +223,38 @@ begin
       game_over <= '0';
       score_reg         <= (others => '0');
       score_div_counter <= 0;
+      game_state <= MENU;
+      speed_reg  <= 3;
+      game_over  <= '0';
 
     elsif rising_edge(clk) then
       wb_ack_o <= '0';
       game_reset_req <= '0';
 
-      -- latch short button pulse until next game tick
-      if jump_i = '1' then
+      -- btnC nur während RUNNING als Sprung merken
+      if game_state = RUNNING and jump_i = '1' then
         jump_request <= '1';
+      end if;
+
+      -- Menü: btnC = Speed ändern, btnR = Start
+      if game_state = MENU then
+        if jump_i = '1' then
+          if speed_reg = 5 then
+            speed_reg <= 1;
+          else
+            speed_reg <= speed_reg + 1;
+          end if;
+        end if;
+
+        if start_i = '1' then
+          game_state     <= RUNNING;
+          game_over      <= '0';
+          score_reg      <= (others => '0');
+          velocity_y     <= 0;
+          jump_request   <= '0';
+          game_reset_req <= '1';
+        end if;
+
       end if;
 
 
@@ -251,10 +283,21 @@ begin
                 player_y_reg <= to_unsigned(370, 32);
                 velocity_y   <= 0;
                 game_reset_req <= '1';
-                game_over    <= '0';
                 jump_request <= '0';
                 score_reg         <= (others => '0');
                 score_div_counter <= 0;
+                game_state     <= MENU;
+                game_over      <= '0';
+              end if;
+
+            -- 0x1000_0018 SPEED
+            when "0110" =>
+              if to_integer(unsigned(wb_dat_i(3 downto 0))) < 1 then
+                speed_reg <= 1;
+              elsif to_integer(unsigned(wb_dat_i(3 downto 0))) > 5 then
+                speed_reg <= 5;
+              else
+                speed_reg <= to_integer(unsigned(wb_dat_i(3 downto 0)));
               end if;
 
             when others =>
@@ -265,12 +308,12 @@ begin
       end if;
 
       -- Hardware player physics
-      if game_tick = '1' and game_over = '0' then
+      if game_tick = '1' and game_state = RUNNING then
         y_next := to_integer(player_y_reg(9 downto 0));
         v_next := velocity_y;
 
         -- jump only from ground or block
-        if (jump_request = '1' or jump_i = '1') and
+        if (jump_request = '1' or jump_hold_i = '1') and
           (y_next = PLAYER_GROUND_Y or y_next = OBSTACLE_Y - PLAYER_SIZE) then
           v_next := JUMP_STRENGTH;
         else
@@ -311,7 +354,7 @@ begin
         jump_request <= '0';
       end if;
 
-      if game_tick = '1' and game_over = '0' then
+      if game_tick = '1' and  game_state = RUNNING then
         if score_div_counter = 59 then
           score_div_counter <= 0;
           score_reg <= score_reg + 1;
@@ -321,6 +364,7 @@ begin
 
         if side_collision = '1' or spike_collision = '1' then
           game_over <= '1';
+          game_state <= GAME_OVER_STATE;
         end if;
       end if;
 
@@ -346,6 +390,9 @@ begin
 
         when "0101" =>
           wb_dat_o <= std_logic_vector(score_reg);
+        
+        when "0110" =>
+          wb_dat_o <= std_logic_vector(to_unsigned(speed_reg, 32));
 
         when others =>
           wb_dat_o <= (others => '0');
@@ -425,6 +472,25 @@ begin
           color <= x"FF0";
         end if;
 
+      end if;
+
+      if game_state = MENU then
+        color <= x"111";
+
+        -- Speed bar background
+        if sy >= 210 and sy < 230 and sx >= 220 and sx < 420 then
+          color <= x"333";
+        end if;
+
+        -- Speed bar fill
+        if sy >= 210 and sy < 230 and sx >= 220 and sx < 220 + speed_reg * 40 then
+          color <= x"0F0";
+        end if;
+
+        -- player preview
+        if sx >= 100 and sx < 130 and sy >= 370 and sy < 400 then
+          color <= x"0FF";
+        end if;
       end if;
 
     else

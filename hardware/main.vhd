@@ -30,6 +30,7 @@ entity main is
     rs_rx       : in    std_logic;
     rs_tx       : out   std_logic;
     btn_c       : in    std_logic;
+    btn_r       : in std_logic; 
     vga_red_0   : out   std_logic;
     vga_red_1   : out   std_logic;
     vga_red_2   : out   std_logic;
@@ -108,6 +109,14 @@ architecture structural of main is
   signal vga_rdata        : std_logic_vector(31 downto 0);
   signal vga_ack          : std_logic := '0';
 
+  -- speed
+  signal start_pulse      : std_logic := '0';
+
+  -- button 
+  signal jump_hold      : std_logic := '0';
+  signal btn_c_meta_h   : std_logic := '0';
+  signal btn_c_sync_h   : std_logic := '0';
+
 begin
 
   irq_pulses <= (vga_vblank_pulse, uart_pulse, button_pulse);
@@ -157,6 +166,21 @@ begin
 
   end process reset_proc;
 
+  process (clk) is
+  begin
+    if rising_edge(clk) then
+      if system_reset = '1' then
+        btn_c_meta_h <= '0';
+        btn_c_sync_h <= '0';
+      else
+        btn_c_meta_h <= btn_c;
+        btn_c_sync_h <= btn_c_meta_h;
+      end if;
+    end if;
+  end process;
+
+  jump_hold <= btn_c_sync_h;
+
   -- =========================================================================
   -- NEORV32 Unified Flat Bus Interface Assignments
   -- =========================================================================
@@ -169,6 +193,14 @@ begin
       rstn_i  => system_reset_n,
       btn_i   => btn_c,
       pulse_o => button_pulse
+    );
+
+  start_button_inst : entity lib.button_pulse_detector
+    port map (
+      clk_i   => clk,
+      rstn_i  => system_reset_n,
+      btn_i   => btn_r,
+      pulse_o => start_pulse
     );
 
   -- =========================================================================
@@ -233,7 +265,9 @@ begin
       h_sync      => h_sync,
       v_sync      => v_sync,
 
-      jump_i => button_pulse
+      jump_i => button_pulse,
+      jump_hold_i => jump_hold,
+      start_i => start_pulse
     );
 
   -- Slice internal VGA color vectors to top-level single-bit output ports

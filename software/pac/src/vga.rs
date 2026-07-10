@@ -5,6 +5,7 @@ const PLAYER_Y: *mut u32 = 0x1000_0004 as *mut u32;
 const BG_COLOR: *mut u32 = 0x1000_0008 as *mut u32;
 const CONTROL: *mut u32 = 0x1000_0010 as *mut u32;
 const SCORE: *const u32 = 0x1000_0014 as *const u32;
+const SPEED: *mut u32 = 0x1000_0018 as *mut u32;
 
 
 /// Sets player x-position
@@ -82,5 +83,12 @@ pub fn read_game_over() -> bool {
 pub fn read_score() -> u32 {
     unsafe {
         read_volatile(SCORE)
+    }
+}
+
+
+pub fn set_game_speed(speed: u32) {
+    unsafe {
+        write_volatile(SPEED, speed);
     }
 }

@@ -7,7 +7,13 @@ mod interrupts;
 
 use core::arch::global_asm;
 use pac::println;
-use pac::vga::{set_bg_color, set_player_pos, set_player_y, reset_game, read_game_over, read_score}; 
+use pac::vga::{set_bg_color, 
+    set_player_pos, 
+    set_player_y, 
+    reset_game, 
+    read_game_over, 
+    read_score, 
+    set_game_speed}; 
 
 use crate::interrupts::setup_interrupts;
 
