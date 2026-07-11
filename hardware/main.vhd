@@ -112,6 +112,11 @@ architecture structural of main is
   -- speed
   signal start_pulse      : std_logic := '0';
 
+  -- jmp button
+  signal jump_hold      : std_logic := '0';
+  signal btn_c_meta_h   : std_logic := '0';
+  signal btn_c_sync_h   : std_logic := '0';
+
 begin
 
   irq_pulses <= (vga_vblank_pulse, uart_pulse, button_pulse);
@@ -161,6 +166,20 @@ begin
 
   end process reset_proc;
 
+    process (clk) is
+    begin
+      if rising_edge(clk) then
+        if system_reset = '1' then
+          btn_c_meta_h <= '0';
+          btn_c_sync_h <= '0';
+        else
+          btn_c_meta_h <= btn_c;
+          btn_c_sync_h <= btn_c_meta_h;
+        end if;
+      end if;
+    end process;
+
+  jump_hold <= btn_c_sync_h;
 
   -- =========================================================================
   -- NEORV32 Unified Flat Bus Interface Assignments
@@ -247,6 +266,7 @@ begin
       v_sync      => v_sync,
 
       jump_i => button_pulse,
+      jump_hold_i => jump_hold,
       start_i => start_pulse
     );
 

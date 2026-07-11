@@ -130,7 +130,7 @@ pub extern "C" fn main() -> ! {
     println!("Hello World");
     // setup_interrupts();
 
-    set_bg_color(0xB, 0xC, 0xF);
+    set_bg_color(0, 0, 8);
     set_player_pos(100, 370);
     reset_game();
 
