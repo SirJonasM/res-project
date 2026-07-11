@@ -288,41 +288,50 @@ begin
       wb_ack_o <= '0';
       game_reset_req <= '0';
 
-
       -- btnC nur während RUNNING als Sprung merken
       if game_state = RUNNING and jump_i = '1' then
         jump_request <= '1';
       end if;
 
-      -- Menü: btnC = Speed ändern
+      -- MENU:
+      -- btnR = Speed ändern
+      -- btnC = Start / bestätigen
       if game_state = MENU then
-        if jump_i = '1' then
+
+        -- btnR cycles speed: 3 -> 4 -> 5 -> 3
+        if start_i = '1' then
           if speed_reg = 5 then
             speed_reg <= 3;
           else
             speed_reg <= speed_reg + 1;
           end if;
         end if;
+
+        -- btnC confirms and starts game
+        if jump_i = '1' then
+          game_state        <= RUNNING;
+          game_over         <= '0';
+          score_reg         <= (others => '0');
+          score_div_counter <= 0;
+          velocity_y        <= 0;
+          jump_request      <= '0';
+          game_reset_req    <= '1';
+        end if;
+
       end if;
 
-      -- btnR / start_i steuert Start, Pause, Resume
+      -- RUNNING / PAUSED:
+      -- btnR = Pause / Resume
       if start_i = '1' then
-        if game_state = MENU then
-          game_state     <= RUNNING;
-          game_over      <= '0';
-          score_reg      <= (others => '0');
-          score_div_counter <= 0;
-          velocity_y     <= 0;
-          jump_request   <= '0';
-          game_reset_req <= '1';
 
-        elsif game_state = RUNNING then
+        if game_state = RUNNING then
           game_state <= PAUSED;
 
         elsif game_state = PAUSED then
           game_state <= RUNNING;
 
         end if;
+
       end if;
 
     if (wb_cyc_i = '1' and wb_stb_i = '1') then
