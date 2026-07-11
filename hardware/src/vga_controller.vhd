@@ -114,6 +114,8 @@ architecture behavioral of vga_controller is
 
   type game_state_t is (MENU, RUNNING, PAUSED, GAME_OVER_STATE);
   signal game_state : game_state_t := MENU;
+  signal level_finished_req : std_logic := '0';
+  signal reset_delay_counter : integer range 0 to 90 := 0;
 
   --tilemap
   constant TILE_EMPTY : integer := 0;
@@ -124,43 +126,49 @@ architecture behavioral of vga_controller is
   constant MAP_START_X : integer := 640;
 
   constant MAP_ROWS : integer := 3;
-  constant MAP_COLS : integer := 36;
+  constant MAP_COLS : integer := 64;
 
   type tile_row_t is array (0 to MAP_COLS - 1) of integer range 0 to 2;
   type tile_map_t is array (0 to MAP_ROWS - 1) of tile_row_t;
 
 
-  constant LEVEL_MAP : tile_map_t := (
-    -- row 2 (oberste Reihe)
-    (
-      TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY
-    ),
+constant LEVEL_MAP : tile_map_t := (
+  -- obere Reihe
+  (
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY
+  ),
 
-    -- row 1 (mittlere Reihe)
-    (
-      TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY
-    ),
+  -- mittlere Reihe
+  (
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK
+  ),
 
-    -- row 0 (unterste Reihe)
-    (
-      TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY,
-      TILE_EMPTY, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_SPIKE, TILE_EMPTY,
-      TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-      TILE_SPIKE, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY,
-      TILE_SPIKE, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY
-    )
-  );
+  -- untere Reihe
+  (
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_SPIKE, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK,
+    TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_SPIKE,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY,
+    TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_SPIKE,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_SPIKE, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK
+  )
+);
 
   constant LEVEL_END_X : integer := MAP_START_X + MAP_COLS * TILE_SIZE;
   signal camera_x : integer range 0 to 4095 := 0;
@@ -241,8 +249,11 @@ begin
   begin
     if system_reset = '1' then
       camera_x <= 0;
+      level_finished_req <= '0';
 
     elsif rising_edge(clk) then
+      level_finished_req <= '0';
+
       if game_reset_req = '1' then
         camera_x <= 0;
 
@@ -250,7 +261,7 @@ begin
         if camera_x < LEVEL_END_X then
           camera_x <= camera_x + speed_reg;
         else
-          camera_x <= 0;
+          level_finished_req <= '1';
         end if;
       end if;
     end if;
@@ -274,7 +285,7 @@ begin
     if system_reset = '1' then
       player_x_reg <= to_unsigned(100, 32);
       player_y_reg <= to_unsigned(370, 32);
-      bg_color_reg <= x"BCF";
+      bg_color_reg <= x"008";
       wb_ack_o     <= '0';
       velocity_y   <= 0;
       jump_request <= '0';
@@ -283,10 +294,16 @@ begin
       game_state <= MENU;
       speed_reg  <= 3;
       game_over  <= '0';
+      reset_delay_counter <= 0;
 
     elsif rising_edge(clk) then
       wb_ack_o <= '0';
       game_reset_req <= '0';
+
+      if level_finished_req = '1' and game_state = RUNNING then
+        game_over  <= '1';
+        game_state <= GAME_OVER_STATE;
+      end if;
 
       -- btnC nur während RUNNING als Sprung merken
       if game_state = RUNNING and jump_i = '1' then
@@ -364,6 +381,7 @@ begin
               score_div_counter <= 0;
               game_state     <= MENU;
               game_over      <= '0';
+              reset_delay_counter <= 0;
             end if;
 
           -- 0x1000_0018 SPEED
@@ -484,6 +502,33 @@ begin
         end if;
       end if;
 
+      -- automatisch nach Game Over / Level-Ende zurück ins Menü
+      if game_tick = '1' then
+        if game_state = GAME_OVER_STATE then
+
+          if reset_delay_counter = 90 then
+            player_x_reg <= to_unsigned(100, 32);
+            player_y_reg <= to_unsigned(370, 32);
+            velocity_y   <= 0;
+            jump_request <= '0';
+
+            score_reg         <= (others => '0');
+            score_div_counter <= 0;
+
+            game_over      <= '0';
+            game_state     <= MENU;
+            game_reset_req <= '1';
+
+            reset_delay_counter <= 0;
+          else
+            reset_delay_counter <= reset_delay_counter + 1;
+          end if;
+
+      else
+        reset_delay_counter <= 0;
+      end if;
+    end if;
+
     end if;
   end process;
 
@@ -529,6 +574,7 @@ begin
     variable tile_y : integer;
     variable local_x : integer;
     variable local_y : integer;
+    variable progress_w : integer;
   begin
 
     px := to_integer(player_x_reg(9 downto 0));
@@ -587,14 +633,20 @@ begin
         end loop;
       end loop;
 
+      -- echter Map-Fortschritt: camera_x von 0 bis LEVEL_END_X auf 0..600 Pixel skalieren
+      progress_w := (camera_x * 600) / LEVEL_END_X;
+
+      if progress_w > 600 then
+        progress_w := 600;
+      end if;
+
       -- progress bar background
       if (sy >= 10 and sy < 18 and sx >= 20 and sx < 620) then
         color <= x"333";
       end if;
 
       -- progress bar fill
-      if (sy >= 10 and sy < 18 and sx >= 20 and sx < 20 + to_integer(score_reg(15 downto 0)) and
-          to_integer(score_reg(15 downto 0)) < 600) then
+      if (sy >= 10 and sy < 18 and sx >= 20 and sx < 20 + progress_w) then
         color <= x"0F0";
       end if;
 
