@@ -110,7 +110,7 @@ architecture behavioral of vga_controller is
   signal score_div_counter : integer range 0 to 59 := 0;
 
   -- speed
-  signal speed_reg : integer range 3 to 5 := 3;
+  signal speed_reg : integer range 3 to 4 := 3;
 
   type game_state_t is (MENU, RUNNING, PAUSED, GAME_OVER_STATE);
   signal game_state : game_state_t := MENU;
@@ -135,7 +135,7 @@ architecture behavioral of vga_controller is
 constant LEVEL_MAP : tile_map_t := (
   -- obere Reihe
   (
-    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
@@ -159,7 +159,7 @@ constant LEVEL_MAP : tile_map_t := (
 
   -- untere Reihe
   (
-    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_SPIKE, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK,
     TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_SPIKE,
@@ -301,7 +301,7 @@ begin
       game_reset_req <= '0';
 
       if level_finished_req = '1' and game_state = RUNNING then
-        game_over  <= '1';
+        -- game_over  <= '1';
         game_state <= GAME_OVER_STATE;
       end if;
 
@@ -317,10 +317,10 @@ begin
 
         -- btnR cycles speed: 3 -> 4 -> 5 -> 3
         if start_i = '1' then
-          if speed_reg = 5 then
+          if speed_reg = 4 then
             speed_reg <= 3;
           else
-            speed_reg <= speed_reg + 1;
+            speed_reg <= 4;
           end if;
         end if;
 
@@ -388,8 +388,8 @@ begin
           when "0110" =>
             if to_integer(unsigned(wb_dat_i(3 downto 0))) < 3 then
               speed_reg <= 3;
-            elsif to_integer(unsigned(wb_dat_i(3 downto 0))) > 5 then
-              speed_reg <= 5;
+            elsif to_integer(unsigned(wb_dat_i(3 downto 0))) >4 then
+              speed_reg <= 4;
             else
               speed_reg <= to_integer(unsigned(wb_dat_i(3 downto 0)));
             end if;
@@ -665,16 +665,16 @@ begin
       if game_state = MENU then
         color <= x"111";
 
-        -- Speed bar background
-        if sy >= 210 and sy < 230 and sx >= 220 and sx < 340 then
-          color <= x"333";
-        end if;
+      -- Speed bar background, 2 Stufen a 40 Pixel
+      if sy >= 210 and sy < 230 and sx >= 220 and sx < 300 then
+        color <= x"333";
+      end if;
 
-        -- Speed bar fill: Speed 3 = 1 Balken, Speed 4 = 2, Speed 5 = 3
-        if sy >= 210 and sy < 230 and
-          sx >= 220 and sx < 220 + (speed_reg - 2) * 40 then
-          color <= x"0F0";
-        end if;
+      -- Speed 3 = 40 Pixel, Speed 4 = 80 Pixel
+      if sy >= 210 and sy < 230 and
+        sx >= 220 and sx < 220 + (speed_reg - 2) * 40 then
+        color <= x"0F0";
+      end if;
 
         -- player preview
         if sx >= 100 and sx < 130 and sy >= 370 and sy < 400 then

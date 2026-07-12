@@ -131,8 +131,9 @@ pub extern "C" fn main() -> ! {
     // setup_interrupts();
 
     set_bg_color(0, 0, 8);
-    set_player_pos(100, 370);
-    reset_game();
+    let mut was_game_over = false;
+    // set_player_pos(100, 370);
+    // reset_game();
 
     let mut app = App {
         player: Player {
@@ -143,55 +144,27 @@ pub extern "C" fn main() -> ! {
         speed: Speed::Low,
     };
 
-    /*loop {
-        let event = GAME_QUEUE.lock(|queue| queue.pop());
-        match event {
-            Some(GameEvent::VBlank) => app.next_frame(),
-            Some(GameEvent::ButtonJump) => app.player_jump(),
-            Some(GameEvent::LevelStart) => app.start_level(),
-            Some(GameEvent::PlayerDeath) => app.player_died(),
-            None => {}
-        };
-        pac::wdt::watchdog_feed();
-    } */
-
     loop {
-    if read_game_over() {
-        let score = read_score();
-        println!("Game Over! Score: {}", score);
+        let game_over = read_game_over();
 
-        for _ in 0..20_000_000 {
-            core::hint::spin_loop();
-            pac::wdt::watchdog_feed();
+        if game_over && !was_game_over {
+            let score = read_score();
+            println!("Game Over! Score: {}", score);
+            was_game_over = true;
         }
 
-        reset_game();
-    }
+        // Wenn VHDL automatisch zurück ins Menü gegangen ist,
+        // wird game_over wieder 0. Dann darf beim nächsten Tod wieder gedruckt werden.
+        if !game_over {
+            was_game_over = false;
+        }
+
 
     pac::wdt::watchdog_feed();
     }
     let mut y: i32 = 370;
     let mut dir: i32 = -1;
 
-   /* loop {
-    set_player_y(y as u32);
-
-    y += dir;
-
-    if y <= 250 {
-        dir = 1;
-    }
-
-    if y >= 370 {
-        dir = -1;
-    }
-
-    for _ in 0..300_000 {
-        core::hint::spin_loop();
-    }
-
-    pac::wdt::watchdog_feed();
-}*/
 }
 
 impl Player {
