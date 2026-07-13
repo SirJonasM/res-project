@@ -122,19 +122,18 @@ architecture behavioral of vga_controller is
   constant TILE_BLOCK : integer := 1;
   constant TILE_SPIKE : integer := 2;
 
-  constant TILE_SIZE  : integer := 30;
+  constant TILE_SIZE  : integer := 30; -- echte Objektgröße
+  constant TILE_STEP  : integer := 32; -- Abstand zwischen zwei Map-Spalten
   constant MAP_START_X : integer := 640;
 
   constant MAP_ROWS : integer := 3;
   constant MAP_COLS : integer := 64;
 
-  type tile_row_t is array (0 to MAP_COLS - 1) of integer range 0 to 2;
-  type tile_map_t is array (0 to MAP_ROWS - 1) of tile_row_t;
+  -- Tilemap als flaches 1D-Array für direkte mathematische Indizierung
+  type tile_map_flat_t is array (0 to (MAP_ROWS * MAP_COLS) - 1) of integer range 0 to 2;   
 
-
-constant LEVEL_MAP : tile_map_t := (
-  -- obere Reihe
-  (
+  constant LEVEL_MAP : tile_map_flat_t := (
+    -- Reihe 0 (Oben) - Index 0 bis 63
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
@@ -142,11 +141,9 @@ constant LEVEL_MAP : tile_map_t := (
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY
-  ),
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
 
-  -- mittlere Reihe
-  (
+    -- Reihe 1 (Mitte) - Index 64 bis 127
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
@@ -154,11 +151,9 @@ constant LEVEL_MAP : tile_map_t := (
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
-    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK
-  ),
+    TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK,
 
-  -- untere Reihe
-  (
+    -- Reihe 2 (Unten) - Index 128 bis 191
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY,
     TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_SPIKE, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK,
@@ -167,60 +162,60 @@ constant LEVEL_MAP : tile_map_t := (
     TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_SPIKE,
     TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY,
     TILE_EMPTY, TILE_SPIKE, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK
-  )
-);
+  );
 
-  constant LEVEL_END_X : integer := MAP_START_X + MAP_COLS * TILE_SIZE;
+  constant LEVEL_END_X : integer := MAP_START_X + MAP_COLS * TILE_STEP;
   signal camera_x : integer range 0 to 4095 := 0;
+
 
 begin
 
   -- collision
-    collision_proc : process (all) is
-      variable px_i      : integer;
-      variable py_i      : integer;
-      variable tile_x    : integer;
-      variable tile_y    : integer;
-      variable side_hit  : std_logic;
-      variable spike_hit : std_logic;
+   collision_proc : process (all) is
+    variable px_i      : integer;
+    variable  py_i      : integer;
+    variable tile_x    : integer;
+    variable tile_y    : integer;
+    variable side_hit  : std_logic;
+    variable spike_hit : std_logic;
     begin
       px_i := to_integer(player_x_reg(9 downto 0));
       py_i := to_integer(player_y_reg(9 downto 0));
 
-      side_hit  := '0';
-      spike_hit := '0';
+  side_hit  := '0';
+  spike_hit := '0';
 
-      for row in 0 to MAP_ROWS - 1 loop
-        tile_y := OBSTACLE_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
+  for row in 0 to MAP_ROWS - 1 loop
+    tile_y := OBSTACLE_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
 
-        for col in 0 to MAP_COLS - 1 loop
-          tile_x := MAP_START_X + col * TILE_SIZE - camera_x;
+    for col in 0 to MAP_COLS - 1 loop
+      tile_x := MAP_START_X + col * TILE_STEP - camera_x;
 
-          if LEVEL_MAP(row)(col) = TILE_BLOCK then
+      if LEVEL_MAP(row * MAP_COLS  + col) = TILE_BLOCK then
 
-            if (px_i < tile_x + TILE_SIZE and
-                px_i + PLAYER_SIZE > tile_x and
-                py_i + PLAYER_SIZE > tile_y + 12 and
-                py_i < tile_y + TILE_SIZE) then
-              side_hit := '1';
-            end if;
+        if (px_i < tile_x + TILE_STEP and
+            px_i + PLAYER_SIZE > tile_x and
+            py_i + PLAYER_SIZE > tile_y + 12 and
+            py_i < tile_y + TILE_SIZE) then
+          side_hit := '1';
+        end if;
 
-          elsif LEVEL_MAP(row)(col) = TILE_SPIKE then
+      elsif LEVEL_MAP(row * 64 + col) = TILE_SPIKE then
 
-            if (px_i < tile_x + SPIKE_WIDTH and
-                px_i + PLAYER_SIZE > tile_x and
-                py_i < tile_y + SPIKE_HEIGHT and
-                py_i + PLAYER_SIZE > tile_y + 8) then
-              spike_hit := '1';
-            end if;
+        if (px_i < tile_x + SPIKE_WIDTH and
+            px_i + PLAYER_SIZE > tile_x and
+            py_i < tile_y + SPIKE_HEIGHT and
+            py_i + PLAYER_SIZE > tile_y + 8) then
+          spike_hit := '1';
+        end if;
 
-          end if;
-        end loop;
-      end loop;
+      end if;
+    end loop;
+  end loop;
 
-      side_collision  <= side_hit;
-      spike_collision <= spike_hit;
-    end process;
+  side_collision  <= side_hit;
+  spike_collision <= spike_hit;
+end process;
 
   -- Drive the physical interrupt output pin
   irq_vblank <= irq_vblank_i;
@@ -281,6 +276,7 @@ begin
     variable landed_on_block : boolean;
     variable on_ground : boolean;
     variable on_block  : boolean;
+
   begin
     if system_reset = '1' then
       player_x_reg <= to_unsigned(100, 32);
@@ -417,10 +413,10 @@ begin
         tile_y := OBSTACLE_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
 
         for col in 0 to MAP_COLS - 1 loop
-          tile_x := MAP_START_X + col * TILE_SIZE - camera_x;
+          tile_x := MAP_START_X + col * TILE_STEP - camera_x;
 
-          if LEVEL_MAP(row)(col) = TILE_BLOCK then
-            if px_i < tile_x + TILE_SIZE and
+          if LEVEL_MAP(row * MAP_COLS  + col) = TILE_BLOCK then
+            if px_i < tile_x + TILE_STEP and
               px_i + PLAYER_SIZE > tile_x and
               py_i + PLAYER_SIZE = tile_y then
               on_block := true;
@@ -448,26 +444,26 @@ begin
       -- 3) Nach Bewegung prüfen: landet der Player auf einem Block?
       landed_on_block := false;
 
-      for row in 0 to MAP_ROWS - 1 loop
-        tile_y := OBSTACLE_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
+        for row in 0 to MAP_ROWS - 1 loop
+          tile_y := OBSTACLE_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
 
-        for col in 0 to MAP_COLS - 1 loop
-          tile_x := MAP_START_X + col * TILE_SIZE - camera_x;
+          for col in 0 to MAP_COLS - 1 loop
+            tile_x := MAP_START_X + col * TILE_STEP - camera_x;
 
-          if LEVEL_MAP(row)(col) = TILE_BLOCK then
-            if px_i < tile_x + TILE_SIZE and
-              px_i + PLAYER_SIZE > tile_x and
-              v_next >= 0 and
-              py_i + PLAYER_SIZE <= tile_y and
-              y_next + PLAYER_SIZE >= tile_y then
+            if LEVEL_MAP(row * MAP_COLS  + col) = TILE_BLOCK then
+              if px_i < tile_x + TILE_STEP and
+                px_i + PLAYER_SIZE > tile_x and
+                v_next >= 0 and
+                py_i + PLAYER_SIZE <= tile_y and
+                y_next + PLAYER_SIZE >= tile_y then
 
-              landed_on_block := true;
-              y_next := tile_y - PLAYER_SIZE;
-              v_next := 0;
+                landed_on_block := true;
+                y_next := tile_y - PLAYER_SIZE;
+                v_next := 0;
+              end if;
             end if;
-          end if;
+          end loop;
         end loop;
-      end loop;
 
       -- 4) Sonst auf Boden landen
       if landed_on_block = false then
@@ -562,141 +558,136 @@ begin
     end process;
 
   -- =========================================================================
-  -- Video Timing and Rendering Engine (Pixel Clock Domain)
+  -- DIREKTE MATHEMATISCHE RENDERING ENGINE (Keine Schleifen!)
   -- =========================================================================
-  -- Drive color from the MMIO register
-    process (all) is
-    variable sx : integer;
-    variable sy : integer;
-    variable px : integer;
-    variable py : integer;
-    variable tile_x  : integer;
-    variable tile_y : integer;
-    variable local_x : integer;
-    variable local_y : integer;
+  process (all) is
+    variable sx         : integer;
+    variable sy         : integer;
+    variable px         : integer;
+    variable py         : integer;
     variable progress_w : integer;
+    
+    -- Variablen für die mathematische Direkt-Bestimmung des Pixels
+    variable world_x    : integer;
+    variable tile_col   : integer;
+    variable tile_row   : integer;
+    variable tile_index : integer;
+    variable tile_val   : integer;
+    variable local_x    : integer;
+    variable local_y    : integer;
   begin
 
     px := to_integer(player_x_reg(9 downto 0));
     py := to_integer(player_y_reg(9 downto 0));
 
-    -- active screen area in his VGA timing:
-    -- h_cnt 144..783 => x 0..639
-    -- v_cnt 35..514  => y 0..479
+    -- Aktiver VGA-Bereich
     if (h_cnt >= 144 and h_cnt < 784 and v_cnt >= 35 and v_cnt < 515) then
 
       sx := h_cnt - 144;
       sy := v_cnt - 35;
 
-      -- background
+      -- Standardmäßig Hintergrundfarbe laden
       color <= bg_color_reg;
 
-      -- ground
+      -- Statischer Boden
       if sy >= GROUND_Y then
-        color <= x"014";
+        color <= x"014"; -- Dunkelgrün
       end if;
 
-      -- draw tilemap
-      for row in 0 to MAP_ROWS - 1 loop
-        tile_y := OBSTACLE_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
+    -- =====================================================================
+    -- DIE DIREKT-BERECHNUNG (DIREKT-MAPPING)
+    -- =====================================================================
+    world_x := sx + camera_x;
 
-        for col in 0 to MAP_COLS - 1 loop
-          tile_x := MAP_START_X + col * TILE_SIZE - camera_x;
+    if world_x >= MAP_START_X and world_x < LEVEL_END_X then
 
-          if LEVEL_MAP(row)(col) = TILE_BLOCK then
+      if sy >= 310 and sy < 400 then
 
-            if (sx >= tile_x and sx < tile_x + TILE_SIZE and
-                sy >= tile_y and sy < tile_y + TILE_SIZE) then
-              color <= x"FF0"; -- gelb
-            end if;
+        tile_col := (world_x - MAP_START_X) / TILE_STEP;
+        tile_row := (sy - 310) / TILE_SIZE;
 
-          elsif LEVEL_MAP(row)(col) = TILE_SPIKE then
+        local_x  := (world_x - MAP_START_X) mod TILE_STEP;
+        local_y  := (sy - 310) mod TILE_SIZE;
 
-            if (sx >= tile_x and sx < tile_x + SPIKE_WIDTH and
-                sy >= tile_y and sy < tile_y + SPIKE_HEIGHT) then
+        tile_index := tile_row * MAP_COLS + tile_col;
+        tile_val   := LEVEL_MAP(tile_index);
 
-              local_x := sx - tile_x;
-              local_y := sy - tile_y;
+        if tile_val = TILE_BLOCK then
+          color <= x"FF0";
 
-              if local_y >= SPIKE_HEIGHT - local_x and
-                local_x < SPIKE_WIDTH / 2 then
-                color <= x"F00"; -- rot
+        elsif tile_val = TILE_SPIKE then
+          if local_x < SPIKE_WIDTH and local_y < SPIKE_HEIGHT then
 
-              elsif local_y >= SPIKE_HEIGHT - ((SPIKE_WIDTH - 1) - local_x) and
-                    local_x >= SPIKE_WIDTH / 2 then
-                color <= x"F00"; -- rot
-              end if;
+            if local_y >= SPIKE_HEIGHT - local_x and
+              local_x < SPIKE_WIDTH / 2 then
+              color <= x"F00";
 
+            elsif local_y >= SPIKE_HEIGHT - ((SPIKE_WIDTH - 1) - local_x) and
+                  local_x >= SPIKE_WIDTH / 2 then
+              color <= x"F00";
             end if;
 
           end if;
-        end loop;
-      end loop;
+        end if;
 
-      -- echter Map-Fortschritt: camera_x von 0 bis LEVEL_END_X auf 0..600 Pixel skalieren
+      end if;
+    end if;    
+
+      -- Progress-Balken oben im Bildschirm
       progress_w := (camera_x * 600) / LEVEL_END_X;
-
       if progress_w > 600 then
         progress_w := 600;
       end if;
 
-      -- progress bar background
       if (sy >= 10 and sy < 18 and sx >= 20 and sx < 620) then
-        color <= x"333";
+        color <= x"333"; -- Hintergrund grau
       end if;
 
-      -- progress bar fill
       if (sy >= 10 and sy < 18 and sx >= 20 and sx < 20 + progress_w) then
-        color <= x"0F0";
+        color <= x"0F0"; -- Fortschritt grün
       end if;
 
-      -- player cube
+      -- Player-Würfel zeichnen
       if (sx >= px and sx < px + PLAYER_SIZE and
           sy >= py and sy < py + PLAYER_SIZE) then
-
         if game_over = '1' then
-          color <= x"F00"; -- rot 
+          color <= x"F00"; -- Rot bei Kollision
         else
-          color <= x"0F4"; -- grün
+          color <= x"0F4"; -- Grün im Spiel
         end if;
-
       end if;
     
+      -- Menü-Overlay
       if game_state = MENU then
         color <= x"111";
 
-      -- Speed bar background, 2 Stufen a 40 Pixel
-      if sy >= 210 and sy < 230 and sx >= 220 and sx < 300 then
-        color <= x"333";
-      end if;
+        -- Menü-Speed-Balken
+        if sy >= 210 and sy < 230 and sx >= 220 and sx < 300 then
+          color <= x"333";
+        end if;
 
-      -- Speed 3 = 40 Pixel, Speed 4 = 80 Pixel
-      if sy >= 210 and sy < 230 and
-        sx >= 220 and sx < 220 + (speed_reg - 2) * 40 then
-        color <= x"0F0";
-      end if;
+        if sy >= 210 and sy < 230 and sx >= 220 and sx < 220 + (speed_reg - 2) * 40 then
+          color <= x"0F0";
+        end if;
 
-        -- player preview
+        -- Player-Vorschau
         if sx >= 100 and sx < 130 and sy >= 370 and sy < 400 then
           color <= x"0F4";
         end if;
       end if;
 
+      -- Pause-Anzeige
       if game_state = PAUSED then
-        -- kleines Pause-Symbol oben rechts
-        if sy >= 20 and sy < 60 and sx >= 560 and sx < 570 then
-          color <= x"F6C";
-        end if;
-
-        if sy >= 20 and sy < 60 and sx >= 585 and sx < 595 then
+        if (sy >= 20 and sy < 60 and sx >= 560 and sx < 570) or
+           (sy >= 20 and sy < 60 and sx >= 585 and sx < 595) then
           color <= x"F6C";
         end if;
       end if;
             
     else
-      color <= x"000";
+      color <= x"000"; -- Blacking außerhalb des aktiven Bereichs
     end if;
-  end process;
+  end process;       
 
   -- Generate structural timing Sync Assertions
   hsync_i <= '0' when (h_cnt < 96) else '1';
