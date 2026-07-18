@@ -33,9 +33,9 @@ entity vga_controller is
     v_sync       : out   std_logic;
 
     -- Game input
-    jump_i       : in    std_logic;
-    jump_hold_i : in std_logic;
-    start_i      : in    std_logic
+    btn_menu       : in    std_logic; -- btn_r for speed and pause
+    jump_hold_i  : in    std_logic;
+    btn_play      : in    std_logic -- btn_c for start und jump
   );
 end entity vga_controller;
 
@@ -76,15 +76,8 @@ architecture behavioral of vga_controller is
   signal game_tick    : std_logic := '0';
   signal tick_counter : integer range 0 to 1666665 := 0;
 
-  -- moving obstacle
-  constant OBSTACLE_WIDTH  : integer := 30;
-  constant OBSTACLE_HEIGHT : integer := 30;
-  constant OBSTACLE_Y      : integer := 370;
-  --constant OBSTACLE_SPEED  : integer := 2;
-  signal obstacle_x : integer range -50 to 700 := 640;
-
   -- jumping cube
-  signal velocity_y   : integer range -20 to 20 := 0;
+  signal velocity_y   : integer range -20 to 20 := 0; -- velocity_y < 0  sprung nach oben
   signal jump_request : std_logic := '0'; -- Buttonpress speichern, weil bei gametick wird vepasst
 
   constant PLAYER_GROUND_Y : integer := 370;
@@ -99,10 +92,7 @@ architecture behavioral of vga_controller is
   --spike
   constant SPIKE_WIDTH  : integer := 20;
   constant SPIKE_HEIGHT : integer := 30;
-  constant SPIKE_Y      : integer := 370;
-  --constant SPIKE_SPEED  : integer := 3;
 
-  signal spike_x : integer range -50 to 700 := 640;
   signal spike_collision : std_logic := '0';
 
   -- score
@@ -115,7 +105,7 @@ architecture behavioral of vga_controller is
   type game_state_t is (MENU, RUNNING, PAUSED, GAME_OVER_STATE);
   signal game_state : game_state_t := MENU;
   signal level_finished_req : std_logic := '0';
-  signal reset_delay_counter : integer range 0 to 90 := 0;
+  signal reset_delay_counter : integer range 0 to 90 := 0; --
 
   --tilemap
   constant TILE_EMPTY : integer := 0;
@@ -164,18 +154,19 @@ architecture behavioral of vga_controller is
     TILE_EMPTY, TILE_SPIKE, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK
   );
 
-  constant LEVEL_END_X : integer := MAP_START_X + MAP_COLS * TILE_STEP;
+  constant LEVEL_END_X : integer := MAP_START_X + MAP_COLS * TILE_STEP; 
   signal camera_x : integer range 0 to 4095 := 0;
 
 
 begin
 
-  -- collision
+  -- collision check
+  -- jede Kachel ausfindig gemacht 
    collision_proc : process (all) is
     variable px_i      : integer;
-    variable  py_i      : integer;
-    variable tile_x    : integer;
-    variable tile_y    : integer;
+    variable py_i      : integer;
+    variable tile_x    : integer; -- x-Position der Map-Kachel
+    variable tile_y    : integer; -- y-Position der Map-Kachel
     variable side_hit  : std_logic;
     variable spike_hit : std_logic;
     begin
@@ -186,26 +177,26 @@ begin
   spike_hit := '0';
 
   for row in 0 to MAP_ROWS - 1 loop
-    tile_y := OBSTACLE_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
+    tile_y := GROUND_Y - (MAP_ROWS - 1 - row) * TILE_SIZE; -- 310 (3.),340 (2.),370 (1.Reihe) , 400 Boden
 
     for col in 0 to MAP_COLS - 1 loop
-      tile_x := MAP_START_X + col * TILE_STEP - camera_x;
+      tile_x := MAP_START_X + col * TILE_STEP - camera_x; 
 
-      if LEVEL_MAP(row * MAP_COLS  + col) = TILE_BLOCK then
+      if LEVEL_MAP(row * MAP_COLS  + col) = TILE_BLOCK then -- block?
 
-        if (px_i < tile_x + TILE_STEP and
-            px_i + PLAYER_SIZE > tile_x and
-            py_i + PLAYER_SIZE > tile_y + 12 and
-            py_i < tile_y + TILE_SIZE) then
-          side_hit := '1';
+        if (px_i < tile_x + TILE_STEP and -- linke playerkante links von rechter tilekante 
+            px_i + PLAYER_SIZE > tile_x and -- rechte playerkante rechts von linker tilekante
+            py_i + PLAYER_SIZE > tile_y + 12 and -- untere playerkante ist unter oberer tilekante
+            py_i < tile_y + TILE_SIZE) then  -- obere playerkante ist über unter tilekante
+          side_hit := '1'; 
         end if;
 
-      elsif LEVEL_MAP(row * 64 + col) = TILE_SPIKE then
+      elsif LEVEL_MAP(row * MAP_COLS + col) = TILE_SPIKE then -- spike?
 
         if (px_i < tile_x + SPIKE_WIDTH and
             px_i + PLAYER_SIZE > tile_x and
-            py_i < tile_y + SPIKE_HEIGHT and
-            py_i + PLAYER_SIZE > tile_y + 8) then
+            py_i + PLAYER_SIZE > tile_y + 8 and
+            py_i < tile_y + SPIKE_HEIGHT ) then
           spike_hit := '1';
         end if;
 
@@ -218,10 +209,11 @@ begin
 end process;
 
   -- Drive the physical interrupt output pin
-  irq_vblank <= irq_vblank_i;
+  irq_vblank <= irq_vblank_i; -- Interrupt
 
 
-  -- game tick
+  -- game tick - noch problematisch, weil nicht mit dem VGA-Bildaufbau synchron
+  -- camera_x mitten im sichtbaren Bild ändern möglich 
   process (clk, system_reset) is
   begin
     if system_reset = '1' then
@@ -297,22 +289,21 @@ end process;
       game_reset_req <= '0';
 
       if level_finished_req = '1' and game_state = RUNNING then
-        -- game_over  <= '1';
+        -- game_over  <= '1'; -- weil 
         game_state <= GAME_OVER_STATE;
       end if;
 
-      -- btnC nur während RUNNING als Sprung merken
-      if game_state = RUNNING and jump_i = '1' then
+      -- btn_c nur während running als Sprung merken
+      if game_state = RUNNING and btn_play = '1' then
         jump_request <= '1';
       end if;
 
-      -- MENU:
-      -- btnR = Speed ändern
-      -- btnC = Start / bestätigen
+      -- MENU
+      -- btn_r = change speed and pause
+      -- btn_c = start and jump
       if game_state = MENU then
-
-        -- btnR cycles speed: 3 -> 4 -> 5 -> 3
-        if start_i = '1' then
+        -- btn_r cycles speed: rollover
+        if btn_menu = '1' then
           if speed_reg = 4 then
             speed_reg <= 3;
           else
@@ -320,8 +311,8 @@ end process;
           end if;
         end if;
 
-        -- btnC confirms and starts game
-        if jump_i = '1' then
+        -- btn_c starts game
+        if btn_play = '1' then
           game_state        <= RUNNING;
           game_over         <= '0';
           score_reg         <= (others => '0');
@@ -334,17 +325,14 @@ end process;
       end if;
 
       -- RUNNING / PAUSED:
-      -- btnR = Pause / Resume
-      if start_i = '1' then
-
+      -- btn_r = Pause / Resume
+      if btn_menu = '1' then
         if game_state = RUNNING then
           game_state <= PAUSED;
 
         elsif game_state = PAUSED then
           game_state <= RUNNING;
-
         end if;
-
       end if;
 
     if (wb_cyc_i = '1' and wb_stb_i = '1') then
@@ -384,7 +372,7 @@ end process;
           when "0110" =>
             if to_integer(unsigned(wb_dat_i(3 downto 0))) < 3 then
               speed_reg <= 3;
-            elsif to_integer(unsigned(wb_dat_i(3 downto 0))) >4 then
+            elsif to_integer(unsigned(wb_dat_i(3 downto 0))) > 4 then
               speed_reg <= 4;
             else
               speed_reg <= to_integer(unsigned(wb_dat_i(3 downto 0)));
@@ -397,20 +385,26 @@ end process;
       end if;
     end if;
 
+
+  
     -- Hardware player physics
     if game_tick = '1' and game_state = RUNNING then
       y_next := to_integer(player_y_reg(9 downto 0));
-      v_next := velocity_y;
+      v_next := velocity_y; -- on ground
 
       px_i := to_integer(player_x_reg(9 downto 0));
       py_i := to_integer(player_y_reg(9 downto 0));
 
       -- 1) Erst prüfen: steht der Player gerade auf Boden oder echtem Block?
-      on_ground := (py_i = PLAYER_GROUND_Y);
+      if py_i = PLAYER_GROUND_Y then
+        on_ground := true;
+      else
+        on_ground := false;
+      end if;
       on_block  := false;
 
       for row in 0 to MAP_ROWS - 1 loop
-        tile_y := OBSTACLE_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
+        tile_y := GROUND_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
 
         for col in 0 to MAP_COLS - 1 loop
           tile_x := MAP_START_X + col * TILE_STEP - camera_x;
@@ -430,7 +424,7 @@ end process;
         (on_ground or on_block) then
         v_next := JUMP_STRENGTH;
       else
-        v_next := velocity_y + GRAVITY;
+        v_next := velocity_y + GRAVITY; 
       end if;
 
       if v_next > 20 then
@@ -439,27 +433,27 @@ end process;
         v_next := -20;
       end if;
 
-      y_next := y_next + v_next;
+      y_next := y_next + v_next; -- up or down 
 
       -- 3) Nach Bewegung prüfen: landet der Player auf einem Block?
       landed_on_block := false;
 
         for row in 0 to MAP_ROWS - 1 loop
-          tile_y := OBSTACLE_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
+          tile_y := GROUND_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;
 
           for col in 0 to MAP_COLS - 1 loop
             tile_x := MAP_START_X + col * TILE_STEP - camera_x;
 
             if LEVEL_MAP(row * MAP_COLS  + col) = TILE_BLOCK then
-              if px_i < tile_x + TILE_STEP and
-                px_i + PLAYER_SIZE > tile_x and
-                v_next >= 0 and
-                py_i + PLAYER_SIZE <= tile_y and
-                y_next + PLAYER_SIZE >= tile_y then
+              if px_i < tile_x + TILE_STEP and 
+                px_i + PLAYER_SIZE > tile_x and -- player tatsächlich horizontal am Block, wird also landen
+                v_next >= 0 and -- fällt
+                py_i + PLAYER_SIZE <= tile_y and -- Unterkante player über block
+                y_next + PLAYER_SIZE >= tile_y then -- afterwards Unterkante auf oder unter der Block
 
                 landed_on_block := true;
-                y_next := tile_y - PLAYER_SIZE;
-                v_next := 0;
+                y_next := tile_y - PLAYER_SIZE; -- setze Player exakt auf Blockoberkante
+                v_next := 0; -- Fall stoppen
               end if;
             end if;
           end loop;
@@ -473,17 +467,19 @@ end process;
         end if;
       end if;
 
-      -- 5) Obere Bildschirmgrenze
+      -- 5) Obere Bildschirmgrenze - eig. unnötig
       if y_next < 0 then
         y_next := 0;
         v_next := 0;
       end if;
-
-      player_y_reg <= to_unsigned(y_next, 32);
+      -- store
+      player_y_reg <= to_unsigned(y_next, 32);  
       velocity_y   <= v_next;
       jump_request <= '0';
     end if;
 
+
+   -- score increases after 60 game ticks, i.e., every second
       if game_tick = '1' and  game_state = RUNNING then
         if score_div_counter = 59 then
           score_div_counter <= 0;
@@ -501,20 +497,16 @@ end process;
       -- automatisch nach Game Over / Level-Ende zurück ins Menü
       if game_tick = '1' then
         if game_state = GAME_OVER_STATE then
-
-          if reset_delay_counter = 90 then
+          if reset_delay_counter = 90 then -- 1.5s nach Gameover bis ins Menü zurückgekehrt wird
             player_x_reg <= to_unsigned(100, 32);
             player_y_reg <= to_unsigned(370, 32);
             velocity_y   <= 0;
             jump_request <= '0';
-
             score_reg         <= (others => '0');
             score_div_counter <= 0;
-
             game_over      <= '0';
             game_state     <= MENU;
             game_reset_req <= '1';
-
             reset_delay_counter <= 0;
           else
             reset_delay_counter <= reset_delay_counter + 1;
@@ -527,6 +519,7 @@ end process;
 
     end if;
   end process;
+
 
     -- Leseprozess, CPU bekommt je nach Adresse den passenden Wert zurück
     process (all) is
@@ -577,11 +570,11 @@ end process;
     variable local_y    : integer;
   begin
 
-    px := to_integer(player_x_reg(9 downto 0));
+    px := to_integer(player_x_reg(9 downto 0)); 
     py := to_integer(player_y_reg(9 downto 0));
 
     -- Aktiver VGA-Bereich
-    if (h_cnt >= 144 and h_cnt < 784 and v_cnt >= 35 and v_cnt < 515) then
+    if (h_cnt >= 144 and h_cnt < 784 and v_cnt >= 35 and v_cnt < 515) then -- 640 x 480
 
       sx := h_cnt - 144;
       sy := v_cnt - 35;
@@ -727,6 +720,8 @@ end process;
 
     end if;
   end process;
+
+
 
   -- 4-Stage Pipeline Latency Delay for VGA alignment
   process (pixel_clock) is

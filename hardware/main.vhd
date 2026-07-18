@@ -57,7 +57,7 @@ architecture structural of main is
   signal led_reg         : std_logic_vector(15 downto 0);
   signal led_rdata       : std_logic_vector(31 downto 0);
   signal irq_rdata       : std_logic_vector(31 downto 0);
-  signal button_pulse    : std_logic                                      := '0';
+  signal button_01    : std_logic                                      := '0';
   signal uart_pulse      : std_logic                                      := '0';
   signal irq_pulses      : std_logic_vector(interrupt_count - 1 downto 0) := (others => '0');
   signal uart_rdata      : std_logic_vector(31 downto 0);
@@ -109,8 +109,8 @@ architecture structural of main is
   signal vga_rdata        : std_logic_vector(31 downto 0);
   signal vga_ack          : std_logic := '0';
 
-  -- speed
-  signal start_pulse      : std_logic := '0';
+  -- play
+  signal button_02      : std_logic := '0';
 
   -- jmp button
   signal jump_hold      : std_logic := '0';
@@ -119,7 +119,7 @@ architecture structural of main is
 
 begin
 
-  irq_pulses <= (vga_vblank_pulse, uart_pulse, button_pulse);
+  irq_pulses <= (vga_vblank_pulse, uart_pulse, button_01);
 
   sel_rom  <= '1' when xbus_adr_sig(31 downto 28) = x"0" else
               '0';
@@ -192,7 +192,7 @@ begin
       clk_i   => clk,
       rstn_i  => system_reset_n,
       btn_i   => btn_c,
-      pulse_o => button_pulse
+      pulse_o => button_02
     );
 
   start_button_inst : entity lib.button_pulse_detector
@@ -200,7 +200,7 @@ begin
       clk_i   => clk,
       rstn_i  => system_reset_n,
       btn_i   => btn_r,
-      pulse_o => start_pulse
+      pulse_o => button_01
     );
 
   -- =========================================================================
@@ -265,9 +265,9 @@ begin
       h_sync      => h_sync,
       v_sync      => v_sync,
 
-      jump_i => button_pulse,
+      btn_play => button_02,
       jump_hold_i => jump_hold,
-      start_i => start_pulse
+      btn_menu => button_01
     );
 
   -- Slice internal VGA color vectors to top-level single-bit output ports
