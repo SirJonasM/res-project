@@ -97,8 +97,8 @@ architecture behavioral of vga_controller is
   --spike
   constant SPIKE_WIDTH  : integer := 20;
   constant SPIKE_HEIGHT : integer := 30;
-  constant SPIKE_BOX_W : integer := 15;
-  constant SPIKE_BOX_H : integer := 15;
+  constant SPIKE_BOX_W : integer := 17;
+  constant SPIKE_BOX_H : integer := 25;
 
   signal spike_collision : std_logic := '0';
 
@@ -188,7 +188,6 @@ architecture behavioral of vga_controller is
   TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK -- 256-263
 );
 
-
   constant LEVEL_END_X : integer := MAP_START_X + MAP_COLS * TILE_STEP; 
   signal camera_x : integer range 0 to 16000 := 0; -- has to be higher then LEVEL_END_X, depends on map size 
 
@@ -226,6 +225,8 @@ begin
 
     side_hit  := '0';
     spike_hit := '0';
+
+    -- additional in order not to calculate several times
     on_block  := false;
     relevant_tile_valid := false;
     relevant_tile_x     := 0;
@@ -243,7 +244,7 @@ begin
     end if;
 
     -- make values available for other processes
-    base_col_sig       <= base_col;
+    base_col_sig  <= base_col;
 
     -- loop only for the the rows
     for row in 0 to MAP_ROWS - 1 loop
@@ -264,7 +265,7 @@ begin
           else
             tile_val := LEVEL_MAP(2 * MAP_COLS + check_col);
           end if;
-
+          -- block collision
           if tile_val = TILE_BLOCK then
 
             if (px_i < tile_x + TILE_STEP and -- left edge of player is to the left of right edge of tile 
@@ -274,8 +275,7 @@ begin
               side_hit := '1'; 
             end if;
 
-            
-          -- standing on block
+          -- standing on block?
             if game_state = RUNNING then
               if px_i < tile_x + TILE_STEP and
                 px_i + PLAYER_SIZE > tile_x and
@@ -284,23 +284,24 @@ begin
               end if;
             end if;
 
+          -- landing on block? 
           if px_i < tile_x + TILE_STEP and
             px_i + PLAYER_SIZE > tile_x and
             py_i + PLAYER_SIZE <= tile_y then
 
-            if relevant_tile_valid = false or tile_y < relevant_tile_y then
+            if relevant_tile_valid = false or tile_y < relevant_tile_y then -- check if there is an block further up
               relevant_tile_valid := true;
               relevant_tile_x     := tile_x;
               relevant_tile_y     := tile_y;
               relevant_tile_val   := tile_val;
             end if;
-
           end if;
 
+          -- spike collision
           elsif tile_val = TILE_SPIKE then
 
-            if (px_i < tile_x + 8 + SPIKE_BOX_W and
-              px_i + PLAYER_SIZE > tile_x + 8 and
+            if (px_i < tile_x + 7 + SPIKE_BOX_W and
+              px_i + PLAYER_SIZE > tile_x + 7 and
               py_i + PLAYER_SIZE > tile_y + TILE_SIZE - SPIKE_BOX_H and
               py_i < tile_y + TILE_SIZE) then
               spike_hit := '1';
@@ -540,22 +541,23 @@ begin
       -- does the player land on a block?
       landed_on_block := false;
 
+      -- already calculated 
       tile_x   := relevant_tile_x_sig;
       tile_y   := relevant_tile_y_sig;
       tile_val := relevant_tile_val_sig;
 
-      if relevant_tile_valid_sig then
+      if relevant_tile_valid_sig then -- there is an potential block to check? 
 
         if tile_val = TILE_BLOCK then
           if px_i < tile_x + TILE_STEP and 
-            px_i + PLAYER_SIZE > tile_x and
-            v_next >= 0 and
-            py_i + PLAYER_SIZE <= tile_y and
-            y_next + PLAYER_SIZE >= tile_y then
+            px_i + PLAYER_SIZE > tile_x and -- player is actually positioned horizontally on the block, so he will land
+            v_next >= 0 and -- falling
+            py_i + PLAYER_SIZE <= tile_y and -- bottom edge of player above block
+            y_next + PLAYER_SIZE >= tile_y then -- afterwards bottom edge at or below the block
 
             landed_on_block := true;
-            y_next := tile_y - PLAYER_SIZE;
-            v_next := 0;
+            y_next := tile_y - PLAYER_SIZE; -- position the player exactly on the top edge of the block, align
+            v_next := 0; -- stop falling
           end if;
         end if;
 
@@ -695,7 +697,7 @@ begin
 
         tile_col := (world_x - MAP_START_X) / TILE_STEP;
 
-        -- avoid division/modulo by TILE_SIZE = 30
+        -- row 
         if sy < 340 then
           tile_row := 0;
           tile_y   := 310;
@@ -720,11 +722,11 @@ begin
 
         elsif tile_val = TILE_SPIKE then
 
-          -- 15x15 vertical spike box, centered in 32px tile
+          -- 15x15 vertical spike box
           if sy >= tile_y + TILE_SIZE - SPIKE_BOX_H and
             sy <  tile_y + TILE_SIZE and
-            world_x >= MAP_START_X + tile_col * TILE_STEP + 8 and
-            world_x <  MAP_START_X + tile_col * TILE_STEP + 8 + SPIKE_BOX_W then
+            world_x >= MAP_START_X + tile_col * TILE_STEP + 7 and
+            world_x <  MAP_START_X + tile_col * TILE_STEP + 7 + SPIKE_BOX_W then
             color <= x"F00";
           end if;
 
