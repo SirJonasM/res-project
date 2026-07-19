@@ -60,7 +60,6 @@ architecture behavioral of vga_controller is
   -- Memory Mapped Register (Holds 12-bit RGB color: Bits 11:8 R, 7:4 G, 3:0 B)
   signal bg_color_reg : std_logic_vector(11 downto 0) := x"008";
 
-  -- Neue Register hinzufügen für Position
   signal player_x_reg : unsigned(31 downto 0) := to_unsigned(100, 32);
   signal player_y_reg : unsigned(31 downto 0) := to_unsigned(370, 32);
 
@@ -83,8 +82,8 @@ architecture behavioral of vga_controller is
   signal vblank_last : std_logic := '0';
 
   -- jumping cube
-  signal velocity_y   : integer range -20 to 20 := 0; -- velocity_y < 0  sprung nach oben
-  signal jump_request : std_logic := '0'; -- Buttonpress speichern, weil bei gametick wird vepasst
+  signal velocity_y   : integer range -20 to 20 := 0; -- velocity_y < 0  jump to top
+  signal jump_request : std_logic := '0'; -- save button press, because Gametick ignores it
 
   constant PLAYER_GROUND_Y : integer := 370;
   constant JUMP_STRENGTH   : integer := -12;
@@ -523,7 +522,7 @@ begin
             if LEVEL_MAP(row * MAP_COLS + check_col) = TILE_BLOCK then  
               if px_i < tile_x + TILE_STEP and 
                 px_i + PLAYER_SIZE > tile_x and -- player is actually positioned horizontally on the block, so he will land
-                v_next >= 0 and -- fällt
+                v_next >= 0 and -- falling
                 py_i + PLAYER_SIZE <= tile_y and -- bottom edge of player above block
                 y_next + PLAYER_SIZE >= tile_y then -- afterwards bottom edge at or below the block
 
