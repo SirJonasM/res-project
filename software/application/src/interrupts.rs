@@ -31,9 +31,9 @@ pub unsafe extern "riscv-interrupt-m" fn trap_handler() {
 }
 
 const IRQ_STATUS_REG: *mut u32 = 0x8000_0000 as *mut u32;
-const IRQ_MASK_BTNC: u32 = 1;
-const IRQ_MASK_UART: u32 = 2;
-const IRQ_MASK_VGA: u32 = 4;
+const IRQ_MASK_BTNC: u32 = 0b1;
+const IRQ_MASK_UART: u32 = 0b10;
+const IRQ_MASK_GAME: u32 = 0b100;
 
 unsafe fn handle_external_interrupts() {
     let status = unsafe { core::ptr::read_volatile(IRQ_STATUS_REG) };
@@ -46,8 +46,8 @@ unsafe fn handle_external_interrupts() {
     {
         print!("{}", c as char);
     }
-    if (status & IRQ_MASK_VGA) != 0 {
-        let event = GameEvent::VBlank;
+    if (status & IRQ_MASK_GAME) != 0 {
+        let event = GameEvent::GameState;
         GAME_QUEUE.lock(|queue| queue.push(event)).unwrap();
     }
 }

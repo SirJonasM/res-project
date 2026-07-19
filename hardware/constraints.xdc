@@ -79,3 +79,4 @@ set_property PACKAGE_PIN P1 [get_ports led14]
 set_property IOSTANDARD LVCMOS33 [get_ports led14]
 set_property PACKAGE_PIN L1 [get_ports led15]					
 set_property IOSTANDARD LVCMOS33 [get_ports led15]
+

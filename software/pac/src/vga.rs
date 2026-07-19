@@ -1,94 +1,88 @@
 use core::ptr::{read_volatile, write_volatile};
 
-const PLAYER_X: *mut u32 = 0x1000_0000 as *mut u32;
-const PLAYER_Y: *mut u32 = 0x1000_0004 as *mut u32;
-const BG_COLOR: *mut u32 = 0x1000_0008 as *mut u32;
-const CONTROL: *mut u32 = 0x1000_0010 as *mut u32;
-const SCORE: *const u32 = 0x1000_0014 as *const u32;
-const SPEED: *mut u32 = 0x1000_0018 as *mut u32;
+// Base address derived from your code comments (e.g., 0x1000_0008 was offset 0x08)
+const GAME_BASE: usize = 0x1000_0000;
 
+// Register offsets (wb_adr_i(5 downto 2) mapped to byte offsets)
+const REG_PLAYER_X: *mut u32 = GAME_BASE as *mut u32; // "0000"
+const REG_PLAYER_Y: *mut u32 = (GAME_BASE + 0x04) as *mut u32; // "0001"
+const REG_BG_COLOR: *mut u32 = (GAME_BASE + 0x08) as *mut u32; // "0010"
+const REG_STATE:    *mut u32 = (GAME_BASE + 0x10) as *mut u32; // "0100" (Read: State, Write: Reset)
+const REG_SCORE:    *mut u32 = (GAME_BASE + 0x14) as *mut u32; // "0101"
+const REG_SPEED:    *mut u32 = (GAME_BASE + 0x18) as *mut u32; // "0110"
 
-/// Sets player x-position
-pub fn set_player_x(x: u32) {
-    unsafe {
-        write_volatile(PLAYER_X, x);
+/// Represents the game state, decoded from your VHDL one-hot representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum GameState {
+    Menu         = 0x01, // "0001"
+    Running      = 0x02, // "0010"
+    Paused       = 0x04, // "0100"
+    GameOver     = 0x08, // "1000"
+    Unknown      = 0x00,
+}
+
+impl From<u32> for GameState {
+    fn from(val: u32) -> Self {
+        match val & 0xF {
+            0x01 => GameState::Menu,
+            0x02 => GameState::Running,
+            0x04 => GameState::Paused,
+            0x08 => GameState::GameOver,
+            _    => GameState::Unknown,
+        }
     }
 }
 
-/// Sets player y-position
-pub fn set_player_y(y: u32) {
-    unsafe {
-        write_volatile(PLAYER_Y, y);
+pub struct GameDriver;
+
+impl GameDriver {
+    /// Reads the player's current X coordinate.
+    pub fn read_player_x() -> u32 {
+        unsafe { read_volatile(REG_PLAYER_X) }
     }
-}
 
-/// Sets both player coordinates
-pub fn set_player_pos(x: u32, y: u32) {
-    set_player_x(x);
-    set_player_y(y);
-}
-
-/// Sets background color using 4-bit RGB values
-pub fn set_bg_color(r: u8, g: u8, b: u8) {
-    let color =
-        (((r & 0xF) as u32) << 8) |
-        (((g & 0xF) as u32) << 4) |
-        ((b & 0xF) as u32);
-
-    unsafe {
-        write_volatile(BG_COLOR, color);
+    /// Reads the player's current Y coordinate.
+    pub fn read_player_y() -> u32 {
+        unsafe { read_volatile(REG_PLAYER_Y) }
     }
-}
 
-/// Reads player x-position
-pub fn read_player_x() -> u32 {
-    unsafe {
-        read_volatile(PLAYER_X)
+    /// Reads the background color (masked to 12 bits as per VHDL mapping).
+    pub fn read_bg_color() -> u16 {
+        unsafe { (read_volatile(REG_BG_COLOR) & 0x0FFF) as u16 }
     }
-}
 
-/// Reads player y-position
-pub fn read_player_y() -> u32 {
-    unsafe {
-        read_volatile(PLAYER_Y)
+    /// Writes a new 12-bit background color.
+    pub fn write_bg_color(color: u16) {
+        let masked_color = (color & 0x0FFF) as u32;
+        unsafe { write_volatile(REG_BG_COLOR, masked_color); }
     }
-}
 
-/// Reads current background color
-pub fn read_bg_color() -> (u8, u8, u8) {
-    let raw_color = unsafe {
-        read_volatile(BG_COLOR)
-    };
-
-    let r = ((raw_color >> 8) & 0xF) as u8;
-    let g = ((raw_color >> 4) & 0xF) as u8;
-    let b = (raw_color & 0xF) as u8;
-
-    (r, g, b)
-}
-
-/// reset
-pub fn reset_game() {
-    unsafe {
-        write_volatile(CONTROL, 1);
+    /// Reads the current one-hot encoded game state.
+    pub fn read_game_state() -> GameState {
+        let raw_state = unsafe { read_volatile(REG_STATE) };
+        GameState::from(raw_state)
     }
-}
 
-pub fn read_game_over() -> bool {
-    unsafe {
-        (read_volatile(CONTROL) & 1) != 0
+    /// Triggers a game reset sequence by writing a '1' to bit 0 of the control/state register.
+    pub fn reset_game() {
+        unsafe { write_volatile(REG_STATE, 0x1); }
     }
-}
 
-pub fn read_score() -> u32 {
-    unsafe {
-        read_volatile(SCORE)
+    /// Reads the current game score.
+    pub fn read_score() -> u32 {
+        unsafe { read_volatile(REG_SCORE) }
     }
-}
 
+    /// Reads the current game speed setting.
+    pub fn read_speed() -> u32 {
+        unsafe { read_volatile(REG_SPEED) }
+    }
 
-pub fn set_game_speed(speed: u32) {
-    unsafe {
-        write_volatile(SPEED, speed);
+    /// Sets the game speed. 
+    /// Note: Your VHDL clamps values automatically (under 3 becomes 3, over 4 becomes 4).
+    pub fn write_speed(speed: u8) {
+        let val = (speed & 0x0F) as u32;
+        unsafe { write_volatile(REG_SPEED, val); }
     }
 }

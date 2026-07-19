@@ -7,13 +7,7 @@ mod interrupts;
 
 use core::arch::global_asm;
 use pac::println;
-use pac::vga::{set_bg_color, 
-    set_player_pos, 
-    set_player_y, 
-    reset_game, 
-    read_game_over, 
-    read_score, 
-    set_game_speed}; 
+use pac::vga::GameDriver; 
 
 use crate::interrupts::setup_interrupts;
 
@@ -26,10 +20,11 @@ pub const QUEUE_SIZE: usize = 16;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum GameEvent {
-    VBlank,
+    GameState,
     ButtonJump,
     LevelStart,
     PlayerDeath,
+    None,
 }
 
 pub struct EventQueue {
@@ -41,7 +36,7 @@ pub struct EventQueue {
 impl EventQueue {
     pub const fn new() -> Self {
         Self {
-            buffer: [GameEvent::VBlank; QUEUE_SIZE],
+            buffer: [GameEvent::None; QUEUE_SIZE],
             head: 0,
             tail: 0,
         }
@@ -107,106 +102,42 @@ impl<T> InterruptMutex<T> {
 // Declare it as a standard immutable static! No more static mut warnings.
 pub static GAME_QUEUE: InterruptMutex<EventQueue> = InterruptMutex::new(EventQueue::new());
 
-enum Speed {
-    Low,
-    Middle,
-    Fast,
-    VeryFast,
-}
-
-struct App {
-    time_step: usize,
-    player: Player,
-    speed: Speed,
-}
-
-struct Player {
-    y: i32,
-    velocity_y: i32,
-}
-
 #[unsafe(no_mangle)]
 pub extern "C" fn main() -> ! {
     println!("Hello World");
-    // setup_interrupts();
+    setup_interrupts();
 
-    set_bg_color(0, 0, 8);
-    let mut was_game_over = false;
-    // set_player_pos(100, 370);
-    // reset_game();
+    GameDriver::write_bg_color(0x008); 
 
-    let mut app = App {
-        player: Player {
-            y: 370,
-            velocity_y: 0,
-        },
-        time_step: 0,
-        speed: Speed::Low,
-    };
+    let mut last_printed_state = GameDriver::read_game_state();
+    println!("Initial State: {:?}", last_printed_state);
 
     loop {
-        let game_over = read_game_over();
-
-        if game_over && !was_game_over {
-            let score = read_score();
-            println!("Game Over! Score: {}", score);
-            was_game_over = true;
-        }
-
-        // Wenn VHDL automatisch zurück ins Menü gegangen ist,
-        // wird game_over wieder 0. Dann darf beim nächsten Tod wieder gedruckt werden.
-        if !game_over {
-            was_game_over = false;
-        }
-
-
-    pac::wdt::watchdog_feed();
-    }
-    let mut y: i32 = 370;
-    let mut dir: i32 = -1;
-
-}
-
-impl Player {
-    pub fn move_player(&mut self) {
-        const GROUND_Y: i32 = 370;
-        const GRAVITY: i32 = 1;
-
-        self.velocity_y += GRAVITY;
-        self.y += self.velocity_y;
-
-        if self.y > GROUND_Y {
-            self.y = GROUND_Y;
-            self.velocity_y = 0;
-        }
-
-        if self.y < 0 {
-            self.y = 0;
-            self.velocity_y = 0;
-        }
-    }
-
-    pub fn jump(&mut self) {
-        const GROUND_Y: i32 = 370;
-
-        if self.y == GROUND_Y {
-            self.velocity_y = -12;
+        // 1. Process Event Queue
+        // We poll the queue using a loop to empty out all pending events per tick
+        while let Some(event) = GAME_QUEUE.lock(|queue| queue.pop()) {
+            match event {
+                GameEvent::GameState => {
+                    let current_state = GameDriver::read_game_state();
+                    
+                    // Only print if the state actually changed from the last time we printed
+                    if current_state != last_printed_state {
+                        println!("Game State Changed: {:?}", current_state);
+                        last_printed_state = current_state;
+                    }
+                }
+                GameEvent::ButtonJump => {
+                    println!("Jump Button Pressed!");
+                }
+                GameEvent::LevelStart => {
+                    println!("Level Started!");
+                }
+                GameEvent::PlayerDeath => {
+                    println!("Player Died!");
+                }
+                GameEvent::None => {}
+            }
         }
     }
 }
 
-impl App {
-    fn next_frame(&mut self) {
-        self.player.move_player();
-        set_player_y(self.player.y as u32);
-    }
-
-    fn player_jump(&mut self) {
-        println!("Player jumped");
-        self.player.jump();
-    }
-
-    fn start_level(&mut self) {}
-
-    fn player_died(&mut self) {}
-}

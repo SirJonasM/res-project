@@ -33,7 +33,7 @@ BIN_FILE="$BUILD_DIR/firmware.bin"
 run-toolchain() {
     local SYSTEM
     SYSTEM=$(nix eval --raw nixpkgs#stdenv.hostPlatform.system)
-    nix develop "github:openxc7/toolchain-nix/0.7.0#devShell.$SYSTEM" --command "$@"
+    nix develop "github:openxc7/toolchain-nix/0.8.0#devShell.$SYSTEM" --command "$@"
 }
 
 # --- UI Formatting Engine ---

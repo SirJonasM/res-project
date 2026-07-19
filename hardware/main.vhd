@@ -91,7 +91,6 @@ architecture structural of main is
   signal xbus_cyc_sig       : std_ulogic;
   signal xbus_ack_sig       : std_ulogic;
   signal xbus_err_sig       : std_ulogic;
-  signal trace              : trace_port_t;
 
   signal sel_rom  : std_logic;
   signal sel_vram : std_logic;
@@ -145,9 +144,6 @@ begin
   led10 <= led_reg(10);
   led11 <= led_reg(11);
   led12 <= led_reg(12);
-  led13 <= trace.valid;
-  led14 <= trace.halt;
-  led15 <= trace.trap;
 
   -- Power-on Reset Logic
   reset_proc : process (clk) is
@@ -212,7 +208,7 @@ begin
       boot_mode_select => 1,
       boot_addr_custom => x"00000000",
       xbus_en          => true,
-      io_tracer_en     => true,
+      -- io_tracer_en     => true,
       io_wdt_en        => true
     )
     port map (
@@ -229,15 +225,14 @@ begin
       xbus_ack_i => xbus_ack_sig,
       xbus_err_i => xbus_err_sig,
 
-      irq_mei_i    => interrupt_pulse,
-      trace_cpu0_o => trace
+      irq_mei_i    => interrupt_pulse
     );
 
   pixel_clock_unit : entity lib.pixel_clock
     port map (
       clk     => clk,
       reset   => system_reset,
-      clk_out => pixel_pulse
+	  pixel_en => pixel_pulse 
     );
 
   -- =========================================================================
@@ -258,12 +253,12 @@ begin
       wb_ack_o => vga_ack,
 
       pixel_clock => pixel_pulse,
-      irq_vblank  => vga_vblank_pulse,
       vga_red     => vga_red_sig,
       vga_green   => vga_green_sig,
       vga_blue    => vga_blue_sig,
       h_sync      => h_sync,
       v_sync      => v_sync,
+	  irq_vblank => vga_vblank_pulse,
 
       btn_play => button_02,
       jump_hold_i => jump_hold,
@@ -322,19 +317,6 @@ begin
       rsrx          => rs_rx,
       rstx          => core_uart_tx,
       uart_rx_irq_o => uart_pulse
-    );
-
-  trap_monitor_unit : entity lib.trap_uart_monitor
-    generic map (
-      clk_freq  => 100000000,
-      baud_rate => 115200
-    )
-    port map (
-      clk_i         => clk,
-      rst_i         => system_reset,
-      trace_i       => trace,
-      uart_tx_mux_o => trap_uart_tx,
-      active_o      => trap_active
     );
 
   rs_tx <= trap_uart_tx when (trap_active = '1') else
