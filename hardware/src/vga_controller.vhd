@@ -66,20 +66,18 @@ architecture behavioral of vga_controller is
 
   constant PLAYER_SIZE : integer := 30;
   constant GROUND_Y    : integer := 400;
-  constant MAP_TOP_Y    : integer := 310;
 
-  -- RGB, HSync und VSync sauber mit pixel_clock registriert werden
+  -- RGB, HSync, VSync, blank are properly synchronized with pixel_clock
   type color_pipe_t is array (0 to 3) of std_logic_vector(11 downto 0);
   signal color_pipe    : color_pipe_t := (others => (others => '0'));
   signal color_delayed : std_logic_vector(11 downto 0);
 
-  -- game_tick wird aus dem VGA-VBlank abgeleitet
+  -- game_tick depends on VGA-VBlank 
   signal game_tick : std_logic := '0';
 
-  -- VBlank-Level im pixel_clock-Bereich
   signal vblank_pix : std_logic := '0';
 
-  -- Synchronisierung von pixel_clock nach clk
+  -- Synchronization of pixel_clock to clk
   signal vblank_meta : std_logic := '0';
   signal vblank_sync : std_logic := '0';
   signal vblank_last : std_logic := '0';
@@ -120,24 +118,24 @@ architecture behavioral of vga_controller is
   constant TILE_BLOCK : integer := 1;
   constant TILE_SPIKE : integer := 2;
 
-  constant TILE_SIZE  : integer := 30; -- echte Objektgröße
-  constant TILE_STEP  : integer := 32; -- Abstand zwischen zwei Map-Spalten
+  constant TILE_SIZE  : integer := 30; 
+  constant TILE_STEP  : integer := 32; 
   constant MAP_START_X : integer := 640;
 
   constant MAP_ROWS : integer := 3;
   constant MAP_COLS : integer := 264;
 
-  -- Tilemap als flaches 1D-Array für direkte mathematische Indizierung
+  -- Tilemap for direct rendering
   type level_map_t is array (0 to (MAP_ROWS * MAP_COLS) - 1) of integer range 0 to 2;   
 
   constant LEVEL_MAP : level_map_t := (
-  -- row 0: oben, Spalten 0..263
+  -- row 0: top, columns 0?263
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 000-015
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 016-031
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, -- 032-047
   TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 048-063
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 064-079
-  TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 080-095
+  TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 080-095
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 096-111
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 112-127
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 128-143
@@ -150,7 +148,7 @@ architecture behavioral of vga_controller is
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 240-255
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 256-263
 
-  -- row 1: mitte, Spalten 0..263
+  -- row 1: middle, columns 0..263
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 000-015
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 016-031
   TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 032-047
@@ -169,7 +167,7 @@ architecture behavioral of vga_controller is
   TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, -- 240-255
   TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 256-263
 
-  -- row 2: unten, Spalten 0..263
+  -- row 2: bottom, columns 0..263
   TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 000-015
   TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, -- 016-031
   TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 032-047
@@ -180,8 +178,8 @@ architecture behavioral of vga_controller is
   TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, -- 112-127
   TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 128-143
   TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 144-159
-  TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 160-175
-  TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 176-191
+  TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 160-175
+  TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK ,TILE_BLOCK , TILE_BLOCK, TILE_BLOCK,TILE_BLOCK , TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, -- 176-191
   TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, -- 192-207
   TILE_BLOCK, TILE_BLOCK, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, -- 208-223
   TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_EMPTY, TILE_EMPTY, TILE_SPIKE, TILE_EMPTY, TILE_EMPTY, TILE_EMPTY, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, TILE_BLOCK, -- 224-239
@@ -191,12 +189,12 @@ architecture behavioral of vga_controller is
 
 
   constant LEVEL_END_X : integer := MAP_START_X + MAP_COLS * TILE_STEP; 
-  signal camera_x : integer range 0 to 16000 := 0;
+  signal camera_x : integer range 0 to 16000 := 0; -- has to be higher then LEVEL_END_X, depends on map size 
 
 
 begin
 
-  -- collision check: nur Tiles nahe beim Player prüfen
+  -- collision check: check only tiles near the player
   collision_proc : process (all) is
     variable px_i           : integer;
     variable py_i           : integer;
@@ -214,21 +212,21 @@ begin
     side_hit  := '0';
     spike_hit := '0';
 
-    -- Playerposition + Kamera-Scroll
+    -- playerposition + camera-Scroll
     player_world_x := px_i + camera_x; 
 
-    -- Map-Spalte berechnen, in der der Player ungefähr ist
+    -- calculate the map column where the player is located
     if player_world_x < MAP_START_X then
       base_col := -1;
     else
       base_col := (player_world_x - MAP_START_X) / TILE_STEP;
     end if;
 
-    -- Nur 3 Reihen prüfen
+    -- loop only for the the rows
     for row in 0 to MAP_ROWS - 1 loop
       tile_y := PLAYER_GROUND_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;    
 
-      -- Nur Spalten in Player-Nähe prüfen: links, mitte, rechts
+      -- only columns near the player: left, center, right
       for col_offset in -1 to 1 loop
         check_col := base_col + col_offset;
 
@@ -238,10 +236,10 @@ begin
 
           if LEVEL_MAP(row * MAP_COLS + check_col) = TILE_BLOCK then
 
-            if (px_i < tile_x + TILE_STEP and -- linke playerkante links von rechter tilekante 
-                px_i + PLAYER_SIZE > tile_x and -- rechte playerkante rechts von linker tilekante
-                py_i + PLAYER_SIZE > tile_y + 12 and -- untere playerkante ist unter oberer tilekante
-                py_i < tile_y + TILE_SIZE) then  -- obere playerkante ist über unter tilekante
+            if (px_i < tile_x + TILE_STEP and -- left edge of player is to the left of right edge of tile 
+                px_i + PLAYER_SIZE > tile_x and -- right edge of player is to the right of left edge of tile
+                py_i + PLAYER_SIZE > tile_y + 12 and -- bottom edge of player is below top edge of tile
+                py_i < tile_y + TILE_SIZE) then  -- top edge of player is above bottom edge of tile
               side_hit := '1'; 
             end if;
 
@@ -267,8 +265,8 @@ begin
   irq_vblank <= irq_vblank_i; -- Interrupt
 
 
-  -- VBlank-Level von pixel_clock nach clk synchronisieren
-  -- und daraus einen Ein-Takt-game_tick erzeugen
+  -- vblank is detected via pixel_clock and reliably transmitted to clk domain
+  -- and a single-cycle game_tick is generated from its rising edge
   process (clk, system_reset) is
   begin
     if system_reset = '1' then
@@ -278,14 +276,14 @@ begin
       game_tick   <= '0';
 
     elsif rising_edge(clk) then
-      -- 2-FF-Synchronisierung von pixel_clock nach clk
+      -- 2-FF Synchronization
       vblank_meta <= vblank_pix;
       vblank_sync <= vblank_meta;
 
-      -- steigende Flanke von vblank_sync erkennen
+      -- rising edge of vblank_sync?
       game_tick <= vblank_sync and not vblank_last;
 
-      -- alten Zustand merken
+      -- store old value
       vblank_last <= vblank_sync;
     end if;
   end process;
@@ -313,10 +311,9 @@ begin
     end if;
   end process;
 
-  -- =========================================================================
+
   -- CPU MMIO Interface (Wishbone Protocol)
-  -- anhängig von der Adresse 
-  -- =========================================================================
+  -- depends on adress
   process (clk, system_reset) is
     variable y_next : integer;
     variable v_next : integer;
@@ -351,11 +348,11 @@ begin
       game_reset_req <= '0';
 
       if level_finished_req = '1' and game_state = RUNNING then
-        -- game_over  <= '1'; -- weil 
+        -- game_over  <= '1';  
         game_state <= GAME_OVER_STATE;
       end if;
 
-      -- btn_c nur während running als Sprung merken
+      -- btn_c mark as a jump only while running
       if game_state = RUNNING and btn_play = '1' then
         jump_request <= '1';
       end if;
@@ -415,7 +412,7 @@ begin
           when "0010" =>
             bg_color_reg <= wb_dat_i(11 downto 0);
 
-          -- 0x1000_0010 CONTROL - zurücksetzen reset_game()
+          -- 0x1000_0010 CONTROL -  reset_game()
           when "0100" =>
             if wb_dat_i(0) = '1' then
               player_x_reg <= to_unsigned(100, 32);
@@ -448,7 +445,6 @@ begin
     end if;
 
 
-  
     -- Hardware player physics
     if game_tick = '1' and game_state = RUNNING then
       y_next := to_integer(player_y_reg(9 downto 0));
@@ -457,7 +453,7 @@ begin
       px_i := to_integer(player_x_reg(9 downto 0));
       py_i := to_integer(player_y_reg(9 downto 0));
 
-      -- 1) Erst prüfen: steht der Player gerade auf Boden oder echtem Block?
+      -- is the player currently standing on the ground or on a real block?
       if py_i = PLAYER_GROUND_Y then
         on_ground := true;
       else
@@ -466,21 +462,17 @@ begin
       on_block  := false;
 
 
-      -- Playerposition + Kamera-Scroll
       player_world_x := px_i + camera_x; 
 
-      -- Map-Spalte berechnen, in der der Player ungefähr ist
       if player_world_x < MAP_START_X then
         base_col := -1;
       else
         base_col := (player_world_x - MAP_START_X) / TILE_STEP;
       end if;
 
-      -- Nur 3 Reihen prüfen
       for row in 0 to MAP_ROWS - 1 loop
         tile_y := PLAYER_GROUND_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;    
 
-        -- Nur Spalten in Player-Nähe prüfen: links, mitte, rechts
         for col_offset in -1 to 1 loop
           check_col := base_col + col_offset;
 
@@ -500,7 +492,7 @@ begin
       end loop;
 
 
-      -- 2) Jetzt erst springen/Gravity berechnen
+      -- calculate jump/gravity 
       if (jump_request = '1' or jump_hold_i = '1') and
         (on_ground or on_block) then
         v_next := JUMP_STRENGTH;
@@ -516,14 +508,12 @@ begin
 
       y_next := y_next + v_next; -- up or down 
 
-      -- 3) Nach Bewegung prüfen: landet der Player auf einem Block?
+      -- does the player land on a block?
       landed_on_block := false;
 
-      -- Nur 3 Reihen prüfen
       for row in 0 to MAP_ROWS - 1 loop
         tile_y := PLAYER_GROUND_Y - (MAP_ROWS - 1 - row) * TILE_SIZE;    
 
-        -- Nur Spalten in Player-Nähe prüfen: links, mitte, rechts
         for col_offset in -1 to 1 loop
           check_col := base_col + col_offset;
 
@@ -532,21 +522,21 @@ begin
 
             if LEVEL_MAP(row * MAP_COLS + check_col) = TILE_BLOCK then  
               if px_i < tile_x + TILE_STEP and 
-                px_i + PLAYER_SIZE > tile_x and -- player tatsächlich horizontal am Block, wird also landen
+                px_i + PLAYER_SIZE > tile_x and -- player is actually positioned horizontally on the block, so he will land
                 v_next >= 0 and -- fällt
-                py_i + PLAYER_SIZE <= tile_y and -- Unterkante player über block
-                y_next + PLAYER_SIZE >= tile_y then -- afterwards Unterkante auf oder unter der Block
+                py_i + PLAYER_SIZE <= tile_y and -- bottom edge of player above block
+                y_next + PLAYER_SIZE >= tile_y then -- afterwards bottom edge at or below the block
 
                 landed_on_block := true;
-                y_next := tile_y - PLAYER_SIZE; -- setze Player exakt auf Blockoberkante
-                v_next := 0; -- Fall stoppen
+                y_next := tile_y - PLAYER_SIZE; -- position the player exactly on the top edge of the block
+                v_next := 0; -- stop falling
               end if;
             end if;
           end if;
         end loop;
       end loop;
 
-      -- 4) Sonst auf Boden landen
+      -- otherwise land on ground
       if landed_on_block = false then
         if y_next > PLAYER_GROUND_Y then
           y_next := PLAYER_GROUND_Y;
@@ -554,7 +544,7 @@ begin
         end if;
       end if;
 
-      -- 5) Obere Bildschirmgrenze - eig. unnötig
+      -- not neseccary actually 
       if y_next < 0 then
         y_next := 0;
         v_next := 0;
@@ -566,7 +556,7 @@ begin
     end if;
 
 
-   -- score increases after 60 game ticks, i.e., every second
+   -- score increases after 60 game ticks, i.e. every second
       if game_tick = '1' and  game_state = RUNNING then
         if score_div_counter = 59 then
           score_div_counter <= 0;
@@ -581,10 +571,10 @@ begin
         end if;
       end if;
 
-      -- automatisch nach Game Over / Level-Ende zurück ins Menü
+      -- after Game Over / Level-end back to menu
       if game_tick = '1' then
         if game_state = GAME_OVER_STATE then
-          if reset_delay_counter = 90 then -- 1.5s nach Gameover bis ins Menü zurückgekehrt wird
+          if reset_delay_counter = 90 then -- returns to the menu 1.5 seconds after game over
             player_x_reg <= to_unsigned(100, 32);
             player_y_reg <= to_unsigned(370, 32);
             velocity_y   <= 0;
@@ -608,7 +598,7 @@ begin
   end process;
 
 
-    -- Leseprozess, CPU bekommt je nach Adresse den passenden Wert zurück
+    -- read operation; the CPU receives the appropriate value based on the address
     process (all) is
     begin
       case wb_adr_i(5 downto 2) is
@@ -637,9 +627,8 @@ begin
       end case;
     end process;
 
-  -- =========================================================================
-  -- DIREKTE MATHEMATISCHE RENDERING ENGINE (Keine Schleifen!)
-  -- =========================================================================
+
+  -- direct mathematical rendering 
   process (all) is
     variable sx         : integer;
     variable sy         : integer;
@@ -659,23 +648,21 @@ begin
     px_i := to_integer(player_x_reg(9 downto 0)); 
     py_i := to_integer(player_y_reg(9 downto 0));
 
-    -- Aktiver VGA-Bereich
+    -- activ VGA area
     if (h_cnt >= 144 and h_cnt < 784 and v_cnt >= 35 and v_cnt < 515) then -- 640 x 480
 
       sx := h_cnt - 144;
       sy := v_cnt - 35;
 
-      -- Standardmäßig Hintergrundfarbe laden
+      -- load background color
       color <= bg_color_reg;
 
-      -- Boden
+      -- bottom
       if sy >= GROUND_Y then
-        color <= x"014"; -- Dunkelgrün
+        color <= x"014"; -- dark green
       end if;
 
-    -- =====================================================================
-    -- DIE DIREKT-BERECHNUNG (DIREKT-MAPPING)
-    -- =====================================================================
+    -- direct mapping
     world_x := sx + camera_x;
 
     if world_x >= MAP_START_X and world_x < LEVEL_END_X then
@@ -685,15 +672,15 @@ begin
         tile_col := (world_x - MAP_START_X) / TILE_STEP;
         tile_row := (sy - 310) / TILE_SIZE;
 
-        -- Position innerhalb des Tiles bestimmen von 0 bis 31 bzw. 0 bis 30
-        local_x  := (world_x - MAP_START_X) mod TILE_STEP; -- wie weit von links entfernt 
-        local_y  := (sy - 310) mod TILE_SIZE; -- -- wie weit von oben entfernt
+        -- determine the position within the tile from 0 to 31 or 0 to 30
+        local_x  := (world_x - MAP_START_X) mod TILE_STEP; -- distance from the left
+        local_y  := (sy - 310) mod TILE_SIZE; -- distance from the top
 
         tile_index := tile_row * MAP_COLS + tile_col;
         tile_val   := LEVEL_MAP(tile_index);
 
         if tile_val = TILE_BLOCK then
-          color <= x"FF0"; -- gelb
+          color <= x"FF0"; -- yellow
 
         elsif tile_val = TILE_SPIKE then
           if local_x < SPIKE_WIDTH and local_y < SPIKE_HEIGHT then
@@ -701,11 +688,11 @@ begin
             -- draw triangle 
             if local_y >= SPIKE_HEIGHT - local_x and
               local_x < SPIKE_WIDTH / 2 then --
-              color <= x"F00"; -- rot
+              color <= x"F00"; -- red
 
             elsif local_y >= SPIKE_HEIGHT - ((SPIKE_WIDTH - 1) - local_x) and
                   local_x >= SPIKE_WIDTH / 2 then
-              color <= x"F00"; -- rot
+              color <= x"F00"; -- red
             end if;
 
           end if;
@@ -714,51 +701,51 @@ begin
       end if;
     end if;    
 
-      -- Progress-Balken oben im Bildschirm
+      -- progress bar at the top of the screen
       progress_w := (camera_x * 600) / LEVEL_END_X;
       if progress_w > 600 then
         progress_w := 600;
       end if;
 
       if (sy >= 10 and sy < 18 and sx >= 20 and sx < 620) then
-        color <= x"333"; -- Hintergrund grau
+        color <= x"333"; -- background grey
       end if;
 
       if (sy >= 10 and sy < 18 and sx >= 20 and sx < 20 + progress_w) then
-        color <= x"0F0"; -- Fortschritt grün
+        color <= x"0F0"; -- progess green
       end if;
 
 
-      -- Player-Würfel zeichnen
+      -- draw player-cube 
       if (sx >= px_i and sx < px_i + PLAYER_SIZE and
           sy >= py_i and sy < py_i + PLAYER_SIZE) then
         if game_over = '1' then
-          color <= x"F00"; -- Rot bei Kollision
+          color <= x"F00"; -- red on collision
         else
-          color <= x"0F4"; -- Grün im Spiel
+          color <= x"0F4"; -- green during gameplay
         end if;
       end if;
     
-      -- Menü-Overlay
+      -- menu
       if game_state = MENU then
-        color <= x"111"; -- schwarz
+        color <= x"111"; -- black
 
-        -- Menü-Speed-Balken
+        -- speed bar in menu
         if sy >= 210 and sy < 230 and sx >= 220 and sx < 300 then
-          color <= x"333"; -- dunek grau
+          color <= x"333"; -- dark grey
         end if;
 
         if sy >= 210 and sy < 230 and sx >= 220 and sx < 220 + (speed_reg - 2) * 40 then
-          color <= x"0F0"; -- helles grün 
+          color <= x"0F0"; --  bright green 
         end if;
 
-        -- Player-Vorschau
+        -- player in menu
         if sx >= 100 and sx < 130 and sy >= 370 and sy < 400 then
-          color <= x"0F4"; -- grün
+          color <= x"0F4"; -- green
         end if;
       end if;
 
-      -- Pause-Anzeige
+      -- pause
       if game_state = PAUSED then
         if (sy >= 20 and sy < 60 and sx >= 560 and sx < 570) or
            (sy >= 20 and sy < 60 and sx >= 585 and sx < 595) then
@@ -767,7 +754,7 @@ begin
       end if;
             
     else
-      color <= x"000"; -- Blacking außerhalb des aktiven Bereichs
+      color <= x"000"; -- black outside the active area
     end if;
   end process;       
 
@@ -810,8 +797,8 @@ begin
     end if;
   end process;
 
-  -- VBlank-Level im pixel_clock-Bereich
-  -- Wird 1, sobald der sichtbare Bereich fertig ist
+  -- VBlank-level in pixel_clock
+  -- -- 1, as soon as the visible area is complete
   process (pixel_clock, system_reset) is
   begin
     if system_reset = '1' then
