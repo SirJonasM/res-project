@@ -5,8 +5,6 @@ set_property IOSTANDARD LVCMOS33 [get_ports clk]
 # Button
 set_property PACKAGE_PIN U18 [get_ports btn_c]						
 set_property IOSTANDARD LVCMOS33 [get_ports btn_c]
-set_property PACKAGE_PIN T18 [get_ports btn_u]						
-set_property IOSTANDARD LVCMOS33 [get_ports btn_u]
 set_property PACKAGE_PIN T18 [get_ports btn_r]						
 set_property IOSTANDARD LVCMOS33 [get_ports btn_r]
 

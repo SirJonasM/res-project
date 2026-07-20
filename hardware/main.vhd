@@ -30,6 +30,7 @@ entity main is
     rs_rx       : in    std_logic;
     rs_tx       : out   std_logic;
     btn_c       : in    std_logic;
+    btn_r       : in std_logic; 
     vga_red_0   : out   std_logic;
     vga_red_1   : out   std_logic;
     vga_red_2   : out   std_logic;
@@ -49,14 +50,14 @@ end entity main;
 
 architecture structural of main is
 
-  constant interrupt_count : positive := 3;
+  constant interrupt_count : positive := 2;
 
   -- Hardware Register to hold the LED state (0 = Off, 1 = On)
   signal interrupt_pulse : std_logic;
   signal led_reg         : std_logic_vector(15 downto 0);
   signal led_rdata       : std_logic_vector(31 downto 0);
   signal irq_rdata       : std_logic_vector(31 downto 0);
-  signal button_pulse    : std_logic                                      := '0';
+  signal button_01    : std_logic                                      := '0';
   signal uart_pulse      : std_logic                                      := '0';
   signal irq_pulses      : std_logic_vector(interrupt_count - 1 downto 0) := (others => '0');
   signal uart_rdata      : std_logic_vector(31 downto 0);
@@ -108,9 +109,17 @@ architecture structural of main is
   signal vga_rdata        : std_logic_vector(31 downto 0);
   signal vga_ack          : std_logic := '0';
 
+  -- play
+  signal button_02      : std_logic := '0';
+
+  -- jmp button
+  signal jump_hold      : std_logic := '0';
+  signal btn_c_meta_h   : std_logic := '0';
+  signal btn_c_sync_h   : std_logic := '0';
+
 begin
 
-  irq_pulses <= (vga_vblank_pulse, uart_pulse, button_pulse);
+  irq_pulses <= ('0', uart_pulse);
 
   sel_rom  <= '1' when xbus_adr_sig(31 downto 28) = x"0" else
               '0';
@@ -157,6 +166,21 @@ begin
 
   end process reset_proc;
 
+    process (clk) is
+    begin
+      if rising_edge(clk) then
+        if system_reset = '1' then
+          btn_c_meta_h <= '0';
+          btn_c_sync_h <= '0';
+        else
+          btn_c_meta_h <= btn_c;
+          btn_c_sync_h <= btn_c_meta_h;
+        end if;
+      end if;
+    end process;
+
+  jump_hold <= btn_c_sync_h;
+
   -- =========================================================================
   -- NEORV32 Unified Flat Bus Interface Assignments
   -- =========================================================================
@@ -168,7 +192,15 @@ begin
       clk_i   => clk,
       rstn_i  => system_reset_n,
       btn_i   => btn_c,
-      pulse_o => button_pulse
+      pulse_o => button_02
+    );
+
+  start_button_inst : entity lib.button_pulse_detector
+    port map (
+      clk_i   => clk,
+      rstn_i  => system_reset_n,
+      btn_i   => btn_r,
+      pulse_o => button_01
     );
 
   -- =========================================================================
@@ -231,7 +263,11 @@ begin
       vga_green   => vga_green_sig,
       vga_blue    => vga_blue_sig,
       h_sync      => h_sync,
-      v_sync      => v_sync
+      v_sync      => v_sync,
+
+      btn_play => button_02,
+      jump_hold_i => jump_hold,
+      btn_menu => button_01
     );
 
   -- Slice internal VGA color vectors to top-level single-bit output ports
@@ -306,7 +342,7 @@ begin
 
   irq : entity lib.irq_peripheral
     generic map (
-      num_irqs => INTERRUPT_COUNT
+      num_irqs => interrupt_count
     )
     port map (
       clk   => clk,
