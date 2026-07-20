@@ -119,7 +119,7 @@ architecture structural of main is
 
 begin
 
-  irq_pulses <= ('0', uart_pulse);
+  irq_pulses <= ('0', '0');
 
   sel_rom  <= '1' when xbus_adr_sig(31 downto 28) = x"0" else
               '0';

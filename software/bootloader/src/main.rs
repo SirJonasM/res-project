@@ -2,13 +2,12 @@
 #![no_main]
 #![feature(abi_riscv_interrupt)]
 use core::arch::global_asm;
-use pac::println;
 use pac::leds::{Led, LedDriver}; // Imported LedDriver alongside Led
+use pac::println;
 use pac::uart::read_char;
 use pac::uart::uart_putchar;
 use pac::wdt::watchdog_feed;
 use pac::wdt::watchdog_init;
-use riscv::register::mstatus;
 use riscv::register::mtvec;
 
 pub extern crate panic_bootloader;
@@ -62,13 +61,13 @@ pub extern "C" fn main() -> ! {
         ));
 
         // 3. Enable Global Interrupts (MIE bit in mstatus)
-        mstatus::set_mie();
+        // mstatus::set_mie();
     }
 
     // Set initial IDLE status safely
     LedDriver::all_off();
     LedDriver::set(LED_STATUS_IDLE, true);
-    
+
     watchdog_init(WDT_TIMEOUT_5_SECONDS);
 
     loop {
@@ -175,7 +174,8 @@ pub extern "C" fn main() -> ! {
     }
 }
 
+
 #[unsafe(no_mangle)]
 unsafe extern "riscv-interrupt-m" fn trap_handler() {
-    panic!()
+    panic!();
 }

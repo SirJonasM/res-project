@@ -90,15 +90,8 @@ ent build hardware
 
 ```
 
-2. **Run Simulations & Testing:**
-Routes verification simulation tests through the toolchain shell:
 
-```bash
-ent test
-
-```
-
-3. **Program the FPGA Bitstream:**
+2. **Program the FPGA Bitstream:**
 Flashes the synthesized hardware configuration image onto the board via JTAG:
 
 ```bash

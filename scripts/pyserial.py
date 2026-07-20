@@ -33,8 +33,9 @@ def main():
         ser = serial.Serial(
             port='/dev/ttyUSB1',
             baudrate=115200,
-            parity=serial.PARITY_EVEN,
+            parity=serial.PARITY_NONE,
             bytesize=serial.EIGHTBITS,
+            stopbits=serial.STOPBITS_ONE,
             timeout=1
         )
     except Exception:

@@ -1,6 +1,4 @@
-use crate::{GAME_QUEUE, GameEvent};
-use pac::vga::{read_vga_color, set_vga_color};
-use pac::{print, println, uart::read_char};
+use pac::{print, uart::read_char};
 use riscv::register::{mie, mstatus, mtvec};
 
 pub fn setup_interrupts() {
