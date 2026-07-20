@@ -7,6 +7,13 @@ mod interrupts;
 
 use core::arch::global_asm;
 use pac::println;
+use pac::vga::{set_bg_color, 
+    set_player_pos, 
+    set_player_y, 
+    reset_game, 
+    read_game_over, 
+    read_score, 
+    set_game_speed}; 
 
 use crate::interrupts::setup_interrupts;
 
@@ -114,52 +121,92 @@ struct App {
 }
 
 struct Player {
-    positon: f32,
-    speed: f32,
+    y: i32,
+    velocity_y: i32,
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn main() -> ! {
     println!("Hello World");
-    setup_interrupts();
+    // setup_interrupts();
+
+    set_bg_color(0, 0, 8);
+    let mut was_game_over = false;
+    // set_player_pos(100, 370);
+    // reset_game();
 
     let mut app = App {
         player: Player {
-            positon: 0.0,
-            speed: 0.0,
+            y: 370,
+            velocity_y: 0,
         },
         time_step: 0,
         speed: Speed::Low,
     };
 
     loop {
-        let event = GAME_QUEUE.lock(|queue| queue.pop());
-        match event {
-            Some(GameEvent::VBlank) => app.next_frame(),
-            Some(GameEvent::ButtonJump) => app.player_jump(),
-            Some(GameEvent::LevelStart) => app.start_level(),
-            Some(GameEvent::PlayerDeath) => app.player_died(),
-            None => {}
-        };
-        pac::wdt::watchdog_feed();
+        let game_over = read_game_over();
+
+        if game_over && !was_game_over {
+            let score = read_score();
+            println!("Game Over! Score: {}", score);
+            was_game_over = true;
+        }
+
+        // Wenn VHDL automatisch zurück ins Menü gegangen ist,
+        // wird game_over wieder 0. Dann darf beim nächsten Tod wieder gedruckt werden.
+        if !game_over {
+            was_game_over = false;
+        }
+
+
+    pac::wdt::watchdog_feed();
     }
+    let mut y: i32 = 370;
+    let mut dir: i32 = -1;
+
 }
 
 impl Player {
     pub fn move_player(&mut self) {
-        self.positon += self.speed;
-        self.speed -= 0.1;
+        const GROUND_Y: i32 = 370;
+        const GRAVITY: i32 = 1;
+
+        self.velocity_y += GRAVITY;
+        self.y += self.velocity_y;
+
+        if self.y > GROUND_Y {
+            self.y = GROUND_Y;
+            self.velocity_y = 0;
+        }
+
+        if self.y < 0 {
+            self.y = 0;
+            self.velocity_y = 0;
+        }
+    }
+
+    pub fn jump(&mut self) {
+        const GROUND_Y: i32 = 370;
+
+        if self.y == GROUND_Y {
+            self.velocity_y = -12;
+        }
     }
 }
 
 impl App {
     fn next_frame(&mut self) {
         self.player.move_player();
+        set_player_y(self.player.y as u32);
     }
+
     fn player_jump(&mut self) {
         println!("Player jumped");
-        self.player.speed = 1.0;
+        self.player.jump();
     }
+
     fn start_level(&mut self) {}
+
     fn player_died(&mut self) {}
 }

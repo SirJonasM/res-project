@@ -1,0 +1,13 @@
+[libraries]
+
+lib.files = [
+  "hardware/main.vhd",
+  "hardware/src/*.vhd",
+  "hardware/src/**/*.vhd",
+]
+
+neorv32.files = [
+  "hardware/risc_core/rtl/core/*.vhd",
+  "hardware/risc_core/rtl/test_setups/*.vhd",
+  "hardware/risc_core/rtl/verilog/*.vhd",
+]
