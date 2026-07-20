@@ -192,7 +192,7 @@ connect-uart() {
         exit 1
     fi
     log-step "Connecting UART console via $DEVICE..."
-    exec tio -b 115200 -d 8 -p none --stopbits 1 "$DEVICE" 
+    exec tio  "$DEVICE" --baudrate 115200 --databits 8  --stopbits 1 --parity none 
 }
 
 flash-app() {
