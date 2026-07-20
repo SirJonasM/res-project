@@ -127,3 +127,36 @@ ent connect
 > * Never compile software components without the release profile optimization flag. `ent` enforces this under the hood during builds and flashes.
 > 
 >
+
+# Team
+
+## Josef
+### **AI Usage**
+
+AI was a constant companion throughout this project, serving as a supporting tool to implement and optimize logic concepts. It was used primarily to accelerate the coding process—for example, assisting with the implementation of `if` statements for collision detection. Ultimately, AI only helped with the technical formulation of code.
+
+It was unable to provide independent or innovative concepts. In many instances, the AI made code unnecessarily complex rather than improving it. When facing complex, project-specific challenges, problem-solving relied almost entirely on manual effort.
+
+### **Contributions**
+
+* **VGA Controller:** Designed and implemented the VGA controller in VHDL *(building upon initial preparation by Jonas)*.
+* **Rendering Engine:** Implemented pixel-based rendering without a framebuffer.
+* **Tilemap Rendering:** Added tilemap rendering for blocks, spikes, the player, menu, and pause screens.
+* **Collision Detection:** Implemented hardware-based collision detection.
+* **Game Physics:** Added basic physics mechanics, including jumping, gravity, and landing.
+* **Processor Integration:** Integrated hardware logic with the NEORV32 via memory-mapped registers *(building upon initial preparation by Jonas)*.
+* **Performance:** Optimized repeated calculations to improve timing performance.
+
+---
+
+## Jonas
+
+### **AI Usage**
+
+Similar to Josef's usage, AI was utilized to speed up technical code implementation. Additionally, it was used frequently to debug issues and automate the development workflow. For instance, the custom build tool (`ent`) was largely AI-generated.
+
+### **Contributions**
+
+* **Infrastructure & Tooling:** Set up the codebase infrastructure, including the environment configuration with Nix and the build tool (`ent`).
+* **Hardware Peripherals:** Implemented hardware peripherals, including LEDs, UART, and the NEORV32 core.
+* **Software Stack:** Developed the bootloader, application code, and the Peripheral Access Crate (PAC).
