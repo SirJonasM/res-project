@@ -9,26 +9,24 @@ const REG_STATE:    *const u32 = (GAME_BASE + 0x10) as *const u32;   // 0x10 (Ga
 const REG_SCORE:    *const u32 = (GAME_BASE + 0x14) as *const u32;   // 0x14
 const REG_SPEED:    *const u32 = (GAME_BASE + 0x18) as *const u32;   // 0x18
 
+/// Represents the status returned by the hardware state register.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum GameState {
-    Menu,
-    Running,
-    Paused,
-    GameOver,
-    Invalid(u32),
+    Active   = 0x0,
+    GameOver = 0x1,
 }
 
 impl From<u32> for GameState {
-    fn from(value: u32) -> Self {
-        match value & 0x0F {
-            0x01 => GameState::Menu,
-            0x02 => GameState::Running,
-            0x04 => GameState::Paused,
-            0x08 => GameState::GameOver,
-            other => GameState::Invalid(other),
+    fn from(val: u32) -> Self {
+        if (val & 0x1) == 1 {
+            GameState::GameOver
+        } else {
+            GameState::Active
         }
     }
 }
+
 pub struct GameDriver;
 
 impl GameDriver {

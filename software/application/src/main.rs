@@ -34,6 +34,7 @@ impl GameSnapshot {
 
     /// Compares against another snapshot and prints all changes.
     pub fn diff(&self, previous: &Self) {
+
         if self.bg_color != previous.bg_color {
             println!(
                 "bg_color: 0x{:03X} -> 0x{:03X}",
